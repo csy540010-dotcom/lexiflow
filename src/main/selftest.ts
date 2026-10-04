@@ -524,6 +524,7 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     await new Promise((r) => setTimeout(r, 1000))
     const todayText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
     assert(/学习计划|调整计划/.test(todayText), '今日页含学习计划入口（DOM 文本断言）')
+    assert(/Good (morning|afternoon|evening)|周一|周二|周三|周四|周五|周六|周日/.test(todayText), '今日页含问候横幅（DOM 文本断言）')
     fs.writeFileSync(path.join(selftestDir, 'm3-today.png'), (await win.webContents.capturePage()).toPNG())
     await win.webContents.executeJavaScript("location.hash = '#/today/study'")
     await new Promise((r) => setTimeout(r, 1000))

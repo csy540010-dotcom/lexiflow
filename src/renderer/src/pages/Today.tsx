@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BookSummary, CustomTaskItem, PlanSettings, TodaySummary } from '../../../shared/types'
 import PlanModal from '../components/PlanModal'
+import HomeHero from '../components/HomeHero'
+import BookCover from '../components/BookCover'
 
 const TASK_KINDS: Array<{ id: string; icon: string; label: string }> = [
   { id: 'listening', icon: '🎧', label: '听力' },
@@ -72,13 +74,13 @@ export default function Today(): React.JSX.Element {
 
   return (
     <section>
-      <h1 className="page-title">今日学习</h1>
-      <p className="page-sub">回答「我今天该做什么」——整个 App 的主入口</p>
+      <HomeHero />
 
       {summary && (
-        <div className="card book-card">
+        <div className="card book-card" style={{ marginTop: 16 }}>
           <div className="book-card-head">
-            <div>
+            <BookCover name={summary.bookName} size="md" />
+            <div className="book-head-main">
               <p className="book-eyebrow">当前词书</p>
               <div className="book-title-row">
                 <h3 className="book-name">{summary.bookName}</h3>
@@ -94,16 +96,19 @@ export default function Today(): React.JSX.Element {
                   ))}
                 </select>
               </div>
+              <div className="bar" style={{ marginTop: 10 }}>
+                <div
+                  className="bar-fill"
+                  style={{
+                    width: summary.totalWords ? Math.round((summary.learnedWords / summary.totalWords) * 100) + '%' : '0%'
+                  }}
+                />
+              </div>
+              <p className="book-progress-line">
+                <strong>{summary.learnedWords}</strong> / {summary.totalWords} 词 ·{' '}
+                {summary.totalWords ? Math.round((summary.learnedWords / summary.totalWords) * 100) : 0}%
+              </p>
             </div>
-            <div className="book-progress-num">
-              {summary.learnedWords} / {summary.totalWords}
-            </div>
-          </div>
-          <div className="bar">
-            <div
-              className="bar-fill"
-              style={{ width: summary.totalWords ? Math.round((summary.learnedWords / summary.totalWords) * 100) + '%' : '0%' }}
-            />
           </div>
           {plan && (
             <div className="book-plan-row">

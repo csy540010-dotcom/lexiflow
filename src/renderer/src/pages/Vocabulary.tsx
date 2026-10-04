@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BookSummary, ImportPreview, ImportResult, WordFilter, WordListItem } from '../../../shared/types'
 import MasteryDots from '../components/MasteryDots'
+import BookCover from '../components/BookCover'
 
 const FILTERS: Array<{ id: WordFilter; label: string }> = [
   { id: 'all', label: '全部' },
@@ -121,6 +122,7 @@ export default function Vocabulary(): React.JSX.Element {
 
       <div className="card vocab-card">
         <div className="vocab-toolbar">
+          {currentBook && <BookCover name={currentBook.name} size="sm" />}
           <select
             value={bookId ?? ''}
             onChange={(e) => {

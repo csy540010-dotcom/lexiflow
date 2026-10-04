@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MusicWordItem, TrackItem } from '../../../shared/types'
+import { coverBackground, waveHeights } from '../lib/covers'
 
 function fmtTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '00:00'
@@ -9,44 +10,6 @@ function fmtTime(sec: number): string {
 }
 
 const SPEEDS = [0.75, 1.0, 1.25, 1.5]
-
-/** 每条音频按标题哈希分配专属配色（多彩封面）。 */
-const COVER_PALETTES: Array<[string, string]> = [
-  ['#427765', '#2f5a4b'], // 深绿
-  ['#3b6ea5', '#274b73'], // 藏蓝
-  ['#a56a3b', '#6e4423'], // 暖棕
-  ['#7a4fa3', '#4d2f6e'], // 紫
-  ['#a54f6a', '#6e2f44'], // 玫红
-  ['#4f8fa5', '#2f5e6e'], // 青
-  ['#8fa54f', '#5e6e2f'], // 橄榄
-  ['#a58b4f', '#6e5a2f'] // 金
-]
-
-function hashStr(s: string): number {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
-  return Math.abs(h)
-}
-
-function paletteOf(seed: string): [string, string] {
-  return COVER_PALETTES[hashStr(seed) % COVER_PALETTES.length]
-}
-
-function coverBackground(seed: string): string {
-  const [a, b] = paletteOf(seed)
-  return `linear-gradient(135deg, ${a}, ${b})`
-}
-
-/** 装饰波形（按标题生成稳定的高度序列）。 */
-function waveHeights(seed: string, count = 56): number[] {
-  let h = hashStr(seed) || 1
-  const out: number[] = []
-  for (let i = 0; i < count; i++) {
-    h = (h * 1103515245 + 12345) | 0
-    out.push(4 + (Math.abs(h) % 16))
-  }
-  return out
-}
 
 type DetailTab = 'raw' | 'organized' | 'words' | 'notes'
 type TopTab = 'mine' | 'online' | 'ai'
@@ -207,7 +170,7 @@ export default function Music(): React.JSX.Element {
 
   async function saveText(): Promise<void> {
     if (!selected) return
-    const updated = await window.lexi.setText(selected.id, textDraft)
+    const updated = await window.lexi.setTrackText(selected.id, textDraft)
     applyUpdated(updated)
     setWords(null)
     flash('文本已保存')
@@ -220,7 +183,7 @@ export default function Music(): React.JSX.Element {
     setProgress({ id: selected.id, done: 0, total: 0 })
     try {
       if (textDraft !== selected.textContent) {
-        const saved = await window.lexi.setText(selected.id, textDraft)
+        const saved = await window.lexi.setTrackText(selected.id, textDraft)
         applyUpdated(saved)
         setWords(null)
       }

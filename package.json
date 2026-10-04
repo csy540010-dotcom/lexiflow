@@ -9,7 +9,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && electron-builder",
+    "dist:portable": "electron-vite build && electron-builder --win portable -c.artifactName=LexiFlow-Portable-${version}.exe"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

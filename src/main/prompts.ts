@@ -16,6 +16,42 @@ export function buildExplainPrompt(word: string, phonetic: string, meaning: stri
     .join('\n')
 }
 
+/** 造句提示生成提示词：与内置提示同风格（中文场景句中嵌英文词）。 */
+export function buildGenPromptsPrompt(word: string, meaning: string): string {
+  return [
+    '为英语单词「' + word + '」生成 3 条中文造句提示。',
+    '每条是一个中文场景句子，句中把英文单词「' + word + '」原样嵌进去（像 "雨后，我总能闻到一股清新的 petrichor 气味。" 这样），供学习者照着写英文句子。',
+    '难度参考四六级，场景要具体、日常、可写。',
+    meaning ? '词典释义：' + meaning : '',
+    '只输出一个 JSON 数组，不要代码块，不要其他文字：["提示1", "提示2", "提示3"]'
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** 从模型回复中提取字符串数组（容忍围栏与杂文；失败再按编号行兜底）。 */
+export function extractPrompts(text: string): string[] {
+  const cleaned = text.replace(/```(?:json)?/gi, '').trim()
+  const start = cleaned.indexOf('[')
+  const end = cleaned.lastIndexOf(']')
+  if (start !== -1 && end > start) {
+    try {
+      const arr = JSON.parse(cleaned.slice(start, end + 1)) as unknown
+      if (Array.isArray(arr)) {
+        const list = arr.map((x) => String(x ?? '').trim()).filter((x) => x.length > 3)
+        if (list.length > 0) return list.slice(0, 5)
+      }
+    } catch {
+      /* 落到行解析 */
+    }
+  }
+  return cleaned
+    .split('\n')
+    .map((line) => line.replace(/^\s*\d+[.、)．]?\s*/, '').trim())
+    .filter((line) => line.length > 5)
+    .slice(0, 3)
+}
+
 export interface GradeResult {
   scores: GradeScores
   revised: string

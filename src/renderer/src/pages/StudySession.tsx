@@ -44,7 +44,7 @@ export default function StudySession(): React.JSX.Element {
   const [sentence, setSentence] = useState('')
   const [grade, setGrade] = useState<{ sentence: string; grade: GradePayload } | null>(null)
   const [favs, setFavs] = useState<SentenceFavoriteItem[]>([])
-  const [busy, setBusy] = useState<'explain' | 'grade' | null>(null)
+  const [busy, setBusy] = useState<'explain' | 'grade' | 'prompts' | null>(null)
   const [error, setError] = useState('')
   const [finished, setFinished] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -128,6 +128,22 @@ export default function StudySession(): React.JSX.Element {
       flash('已收藏修改后的句子')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function genPrompts(): Promise<void> {
+    if (!word) return
+    setBusy('prompts')
+    setError('')
+    try {
+      await window.lexi.genPrompts(word.id)
+      const w = await window.lexi.getWord(word.id)
+      if (w) setWord(w)
+      setPromptIdx(0)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -238,7 +254,13 @@ export default function StudySession(): React.JSX.Element {
                 )}
               </p>
             ) : (
-              <p className="prompt-hint">该词暂无内置造句提示，直接写一个试试——可以参考 AI 讲解里的例句和搭配。</p>
+              <p className="prompt-hint">
+                该词暂无内置造句提示，
+                <button className="text-btn prompt-next" disabled={busy !== null} onClick={() => void genPrompts()}>
+                  {busy === 'prompts' ? '正在生成…' : '✨ 用 AI 生成 3 条'}
+                </button>
+                生成后和内置提示一样可以换着用。
+              </p>
             )}
             <textarea
               className="notes-area"

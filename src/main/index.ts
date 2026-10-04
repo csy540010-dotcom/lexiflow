@@ -20,6 +20,7 @@ import {
   todaySummary,
   todayQueue,
   explainWord,
+  generatePrompts,
   gradeSentence,
   selectBook,
   selectedBookId,
@@ -121,6 +122,7 @@ app.whenReady().then(() => {
   ipcMain.handle('study:selectBook', (_e, bookId: number) => selectBook(Number(bookId)))
   ipcMain.handle('study:selectedBook', () => selectedBookId())
   ipcMain.handle('study:explain', (_e, wordId: number) => explainWord(Number(wordId)))
+  ipcMain.handle('study:genPrompts', (_e, wordId: number) => generatePrompts(Number(wordId)))
   ipcMain.handle('study:submit', (_e, wordId: number, sentence: string) => gradeSentence(Number(wordId), String(sentence ?? '')))
   ipcMain.handle('tasks:list', () => listTasks())
   ipcMain.handle('tasks:add', (_e, kind: string, title: string, target: string) => addTask(String(kind ?? 'custom'), String(title ?? ''), String(target ?? '')))
@@ -164,6 +166,7 @@ app.whenReady().then(() => {
         summary: todaySummary,
         queue: todayQueue,
         selectBook,
+        genPrompts: generatePrompts,
         tasks: { list: listTasks, add: addTask, toggle: toggleTask, remove: removeTask },
         favs: { list: listFavorites, add: addFavorite, remove: removeFavorite }
       },

@@ -46,6 +46,7 @@ const api = {
   selectBook: (bookId: number): Promise<void> => ipcRenderer.invoke('study:selectBook', bookId),
   selectedBook: (): Promise<number | null> => ipcRenderer.invoke('study:selectedBook'),
   explainWord: (wordId: number): Promise<ExplainResult> => ipcRenderer.invoke('study:explain', wordId),
+  genPrompts: (wordId: number): Promise<{ prompts: string[] }> => ipcRenderer.invoke('study:genPrompts', wordId),
   gradeSentence: (wordId: number, sentence: string): Promise<GradeResponse> =>
     ipcRenderer.invoke('study:submit', wordId, sentence),
   listTasks: (): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:list'),

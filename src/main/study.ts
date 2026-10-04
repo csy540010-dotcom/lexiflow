@@ -1,6 +1,6 @@
 import { kvGet, kvSet, getDb } from './db'
 import { chatCompletion } from './ai'
-import { buildExplainPrompt, buildGradePrompt, extractJson, type GradeResult } from './prompts'
+import { buildExplainPrompt, buildGradePrompt, buildGenPromptsPrompt, extractJson, extractPrompts, type GradeResult } from './prompts'
 import { applyGradeToMastery, masteryAverage } from './mastery'
 import { getWord } from './library'
 import { getAiConfig } from './settings'
@@ -153,6 +153,23 @@ export async function gradeSentence(wordId: number, sentence: string): Promise<{
   const status = avg >= 4.5 ? 2 : word.status === 0 ? 1 : word.status
   db.prepare('UPDATE words SET mastery = ?, status = ? WHERE id = ?').run(JSON.stringify(mastery), status, wordId)
   return { grade, word: getWord(wordId) }
+}
+
+/** 无内置提示时用 AI 现场生成，生成后并入该词的提示列表（与内置提示同等对待）。 */
+export async function generatePrompts(wordId: number): Promise<{ prompts: string[] }> {
+  const word = getWord(wordId)
+  if (!word) throw new Error('词条不存在。')
+  if (word.prompts.length > 0) return { prompts: word.prompts }
+  const cfg = getAiConfig()
+  if (!cfg.baseUrl || !cfg.model) throw new Error('还没有配置 AI：请到「设置 → AI 配置」完成配置。')
+  const raw = await chatCompletion(cfg, [{ role: 'user', content: buildGenPromptsPrompt(word.headword, word.meaning) }], {
+    maxTokens: 500,
+    timeoutMs: 45_000
+  })
+  const prompts = extractPrompts(raw)
+  if (prompts.length === 0) throw new Error('AI 返回格式异常，请重试一次。')
+  getDb().prepare('UPDATE words SET prompts = ? WHERE id = ?').run(JSON.stringify(prompts), wordId)
+  return { prompts }
 }
 
 /* ── 自定义任务（听力 / 阅读 / 写作…） ─────────────── */

@@ -42,6 +42,7 @@ interface StudyHooks {
   summary: (bookId?: number) => TodaySummary
   queue: (bookId?: number) => number[]
   selectBook: (bookId: number) => void
+  genPrompts: (wordId: number) => Promise<{ prompts: string[] }>
   tasks: TaskHooks
   favs: {
     list: (wordId: number) => Array<{ id: number; wordId: number; sentence: string; source: string; createdAt: string }>
@@ -220,6 +221,19 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(tasks[0].doneToday === false, '自定义任务：取消打卡')
     tasks = hooks.study.tasks.remove(tasks[0].id)
     assert(tasks.length === 0, '自定义任务：删除')
+
+    // 9.65 AI 生成提示：未配置时给出引导（已配置则跳过，不打真实 API）
+    const aiCfg = hooks.loadSettings().ai
+    if (!aiCfg.hasKey || !aiCfg.baseUrl) {
+      try {
+        await hooks.study.genPrompts(q[0])
+        assert(false, '未配置 AI 时生成提示应当报错')
+      } catch (e) {
+        assert(/配置/.test(e instanceof Error ? e.message : String(e)), '未配置 AI 时生成提示给出引导文案')
+      }
+    } else {
+      console.log('[lexiflow] selftest AI 已配置，跳过生成提示的未配置断言')
+    }
 
     // 9.7 句子收藏（去重 + 删除）
     const favTarget = q[0]

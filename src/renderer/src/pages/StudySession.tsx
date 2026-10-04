@@ -147,6 +147,17 @@ export default function StudySession(): React.JSX.Element {
     }
   }
 
+  async function enqueueTomorrow(): Promise<void> {
+    if (!word) return
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    const due = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    await window.lexi.enqueueReview(word.id, due)
+    flash('已加入复习队列，明天到期')
+    const w = await window.lexi.getWord(word.id)
+    if (w) setWord(w)
+  }
+
   if (loading) {
     return (
       <section>
@@ -272,6 +283,15 @@ export default function StudySession(): React.JSX.Element {
               <button className="btn" disabled={busy !== null || !sentence.trim()} onClick={() => void submitGrade()}>
                 {busy === 'grade' ? '批改中…' : '提交批改'}
               </button>
+              {!word.dueDate ? (
+                <button className="btn btn-ghost" disabled={busy !== null} onClick={() => void enqueueTomorrow()}>
+                  不熟 · 明天再来复习
+                </button>
+              ) : (
+                <span className="task-meta" style={{ alignSelf: 'center' }}>
+                  已在复习队列（{word.dueDate} 到期）
+                </span>
+              )}
             </div>
           </div>
 

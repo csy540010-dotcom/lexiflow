@@ -52,6 +52,40 @@ export function extractPrompts(text: string): string[] {
     .slice(0, 3)
 }
 
+/** 专项练习出题提示词：选择题三类（语境选词 / 搭配辨析 / 近义词辨析）。 */
+export function buildMcqPrompt(word: string, meaning: string, type: 'context' | 'collocation' | 'synonym'): string {
+  const specs: Record<string, string> = {
+    context: `出「语境选词」题：写一个地道的英文例句，把其中的 ${word} 挖掉用 ____ 代替；四个选项为 ${word} 和三个词性与它相同、容易混淆的英语词。学习者靠上下文选词。`,
+    collocation: `出「搭配辨析」题：写一个含空格的英文短句，空格处应填入与 ${word} 相关的地道搭配（介词、固定短语等）；四个选项里只有一个地道正确，其余是学习者常犯的搭配错误。`,
+    synonym: `出「近义词辨析」题：写一个英文短句挖空，四个选项为 ${word} 和三个语义相近的词；只有 ${word} 符合该句语境（可结合中文释义设计迷惑项）。释义：${meaning}`
+  }
+  return [
+    '你是英语老师，面向中国学习者出专项练习题。',
+    specs[type],
+    '只输出一个 JSON 对象（不要代码块，不要其他文字）：',
+    '{"stem":"题干英文句子（含 ____）","options":["A选项","B选项","C选项","D选项"],"answer":0,"explanation":"中文解析：为什么选它，其他为什么不地道"}',
+    'answer 为正确选项的下标（0-3），正确答案的选项内容必须是 ' + word + ' 或对应的地道搭配。',
+    '四个选项顺序打乱，不要有规律。'
+  ].join('\n')
+}
+
+/** 造句类练习任务说明提示词（中译英 / 自由表达）。 */
+export function buildSentenceTaskPrompt(word: string, meaning: string, type: 'translate' | 'free'): string {
+  if (type === 'translate') {
+    return [
+      `为英语单词「${word}」出一道中译英练习：写一个自然的中文句子，句中把这个英文单词原样嵌在中文里（像 "研究人员提醒大家，不要因为可爱的视频而冲动 adopt 一只宠物。" 这样），让学习者把它翻译成地道英文。`,
+      meaning ? `词典释义：${meaning}` : '',
+      '难度参考四六级。只输出这一句中文，不要解释。'
+    ]
+      .filter(Boolean)
+      .join('\n')
+  }
+  return [
+    `为英语单词「${word}」出一个自由表达练习：给学习者一个具体、日常的场景或话题，要求他们用这个词围绕场景写 1-2 句英文。`,
+    '场景要能自然用上这个词。只输出场景描述这一句话（中文），例如："描述一次你完全被一本书或一部电影吸引住的经历，用 absorb 造句。"'
+  ].join('\n')
+}
+
 export interface GradeResult {
   scores: GradeScores
   revised: string

@@ -78,6 +78,16 @@ export function todaySummary(bookId?: number): TodaySummary {
         .get() as { n: number }
     ).n
   )
+  const practicedToday = Number(
+    (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM study_events WHERE kind = 'practice'
+           AND json_extract(payload, '$.date') = date('now', 'localtime')`
+        )
+        .get() as { n: number }
+    ).n
+  )
   return {
     bookId: book.id,
     bookName: book.name,
@@ -86,7 +96,8 @@ export function todaySummary(bookId?: number): TodaySummary {
     newRemaining: Math.max(0, Math.min(dailyNew, unlearned)),
     reviewDue,
     gradedToday,
-    dailyNew
+    dailyNew,
+    practicedToday
   }
 }
 

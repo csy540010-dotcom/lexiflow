@@ -55,7 +55,9 @@ export default function Today(): React.JSX.Element {
   }
 
   const vocabDone = !!summary && summary.newRemaining === 0 && summary.dailyNew > 0
-  const doneCount = (vocabDone ? 1 : 0) + tasks.filter((t) => t.doneToday).length
+  const reviewDone = !!summary && summary.reviewDue === 0
+  const practiceDone = !!summary && summary.practicedToday > 0
+  const doneCount = (vocabDone ? 1 : 0) + (reviewDone ? 1 : 0) + (practiceDone ? 1 : 0) + tasks.filter((t) => t.doneToday).length
   const totalCount = 3 + tasks.length
   const progress = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100)
 
@@ -110,25 +112,25 @@ export default function Today(): React.JSX.Element {
             开始
           </button>
         </div>
-        <div className="task-row task-muted">
+        <div className="task-row">
           <span className="task-icon">🔁</span>
           <div className="task-main">
             <span className="task-title">复习巩固</span>
-            <span className="task-meta">待复习 {summary ? summary.reviewDue : '…'}</span>
+            <span className="task-meta">{summary ? (summary.reviewDue > 0 ? `${summary.reviewDue} 词到期` : '暂无到期') : '…'}</span>
           </div>
-          <span className="task-tag">M4</span>
-          <button className="btn btn-sm btn-ghost" onClick={() => flash('复习模式在 M4 上线：按薄弱点安排练什么')}>
+          <span className={'task-tag' + (reviewDone ? ' task-tag-done' : '')}>{reviewDone ? '✓ 队列已清' : '按薄弱分组'}</span>
+          <button className="btn btn-sm" onClick={() => navigate('/today/review')}>
             开始
           </button>
         </div>
-        <div className="task-row task-muted">
+        <div className="task-row">
           <span className="task-icon">🧠</span>
           <div className="task-main">
             <span className="task-title">单词练习</span>
-            <span className="task-meta">专项训练</span>
+            <span className="task-meta">{practiceDone ? '今日已练' : '专项训练'}</span>
           </div>
-          <span className="task-tag">M4</span>
-          <button className="btn btn-sm btn-ghost" onClick={() => flash('专项训练在 M4 上线：中译英 / 语境选词 / 搭配辨析…')}>
+          <span className={'task-tag' + (practiceDone ? ' task-tag-done' : '')}>{practiceDone ? '✓ 今日已练' : '六类专项'}</span>
+          <button className="btn btn-sm" onClick={() => navigate('/today/practice')}>
             开始
           </button>
         </div>

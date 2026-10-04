@@ -14,6 +14,9 @@ import {
   type WordQueryArgs
 } from './library'
 import { detectObsidianData, importObsidianData, removeImportedBooks } from './import-obsidian'
+import { reviewQueue, graduateReview, tapeReview, enqueueReview } from './review'
+import { PRACTICE_TYPES, practicePool, redoPool, genMcq, genSentenceTask, recordPractice } from './practice'
+import type { PracticeType } from '../shared/types'
 import { loadSettings, saveSettingsPatch, saveAiKey, storedKey, testAi } from './settings'
 import { applyGradeToMastery, masteryAverage, type GradeScores } from './mastery'
 import {
@@ -135,6 +138,20 @@ app.whenReady().then(() => {
   )
   ipcMain.handle('fav:remove', (_e, id: number) => removeFavorite(Number(id)))
 
+  ipcMain.handle('review:queue', () => reviewQueue())
+  ipcMain.handle('review:graduate', (_e, wordId: number) => graduateReview(Number(wordId)))
+  ipcMain.handle('review:tape', (_e, wordId: number) => tapeReview(Number(wordId)))
+  ipcMain.handle('review:enqueue', (_e, wordId: number, dueDate: string) => enqueueReview(Number(wordId), String(dueDate ?? '')))
+
+  ipcMain.handle('practice:types', () => PRACTICE_TYPES)
+  ipcMain.handle('practice:pool', (_e, limit?: number) => practicePool(limit ? Number(limit) : undefined))
+  ipcMain.handle('practice:redoPool', (_e, limit?: number) => redoPool(limit ? Number(limit) : undefined))
+  ipcMain.handle('practice:mcq', (_e, wordId: number, type: PracticeType) => genMcq(Number(wordId), type))
+  ipcMain.handle('practice:task', (_e, wordId: number, type: PracticeType) => genSentenceTask(Number(wordId), type))
+  ipcMain.handle('practice:record', (_e, type: PracticeType, payload: Record<string, unknown>) =>
+    recordPractice(type, payload ?? {})
+  )
+
   const win = createWindow()
   console.log('[lexiflow] window created, db ready')
 
@@ -169,6 +186,12 @@ app.whenReady().then(() => {
         genPrompts: generatePrompts,
         tasks: { list: listTasks, add: addTask, toggle: toggleTask, remove: removeTask },
         favs: { list: listFavorites, add: addFavorite, remove: removeFavorite }
+      },
+      review: {
+        queue: reviewQueue,
+        graduate: graduateReview,
+        tape: tapeReview,
+        seed: enqueueReview
       },
       mastery: { applyGradeToMastery, average: masteryAverage }
     })

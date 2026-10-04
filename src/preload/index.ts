@@ -15,7 +15,11 @@ import type {
   ExplainResult,
   GradeResponse,
   CustomTaskItem,
-  SentenceFavoriteItem
+  SentenceFavoriteItem,
+  ReviewQueueResult,
+  PracticeType,
+  McqResponse,
+  PracticePoolItem
 } from '../shared/types'
 
 const api = {
@@ -58,7 +62,22 @@ const api = {
   listFavorites: (wordId: number): Promise<SentenceFavoriteItem[]> => ipcRenderer.invoke('fav:list', wordId),
   addFavorite: (wordId: number, sentence: string, source: string): Promise<SentenceFavoriteItem[]> =>
     ipcRenderer.invoke('fav:add', wordId, sentence, source),
-  removeFavorite: (id: number): Promise<SentenceFavoriteItem[]> => ipcRenderer.invoke('fav:remove', id)
+  removeFavorite: (id: number): Promise<SentenceFavoriteItem[]> => ipcRenderer.invoke('fav:remove', id),
+
+  reviewQueue: (): Promise<ReviewQueueResult> => ipcRenderer.invoke('review:queue'),
+  graduateReview: (wordId: number): Promise<void> => ipcRenderer.invoke('review:graduate', wordId),
+  tapeReview: (wordId: number): Promise<void> => ipcRenderer.invoke('review:tape', wordId),
+  enqueueReview: (wordId: number, dueDate: string): Promise<void> => ipcRenderer.invoke('review:enqueue', wordId, dueDate),
+
+  practiceTypes: (): Promise<Array<{ id: PracticeType; label: string; engine: string; desc: string }>> =>
+    ipcRenderer.invoke('practice:types'),
+  practicePool: (limit?: number): Promise<PracticePoolItem[]> => ipcRenderer.invoke('practice:pool', limit),
+  redoPool: (limit?: number): Promise<PracticePoolItem[]> => ipcRenderer.invoke('practice:redoPool', limit),
+  genMcq: (wordId: number, type: PracticeType): Promise<McqResponse> => ipcRenderer.invoke('practice:mcq', wordId, type),
+  genSentenceTask: (wordId: number, type: PracticeType): Promise<{ instruction: string; cached: boolean }> =>
+    ipcRenderer.invoke('practice:task', wordId, type),
+  recordPractice: (type: PracticeType, payload: Record<string, unknown>): Promise<void> =>
+    ipcRenderer.invoke('practice:record', type, payload)
 }
 
 export type LexiApi = typeof api

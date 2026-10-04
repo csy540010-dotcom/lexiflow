@@ -51,6 +51,13 @@ interface StudyHooks {
   }
 }
 
+interface ReviewHooks {
+  queue: () => { items: Array<{ wordId: number; headword: string; reason: string }>; counts: Record<string, number>; total: number }
+  graduate: (wordId: number) => void
+  tape: (wordId: number) => void
+  seed: (wordId: number, dueDate: string) => void
+}
+
 interface MasteryHooks {
   applyGradeToMastery: (prev: MasteryData, g: GradeScores) => MasteryData
   average: (m: MasteryData) => number
@@ -65,6 +72,7 @@ export interface SelfTestHooks {
   library: LibraryHooks
   import: ImportHooks
   study: StudyHooks
+  review: ReviewHooks
   mastery: MasteryHooks
 }
 
@@ -244,6 +252,20 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     favs = hooks.study.favs.remove(favs[0].id)
     assert(favs.length === 0, '句子收藏：删除')
 
+    // 9.8 复习队列：种子 → 薄弱分组 → 毕业/胶带 → 清理
+    hooks.review.seed(q[0], '2026-10-04')
+    hooks.review.seed(q[1], '2026-10-04')
+    const rq = hooks.review.queue()
+    assert(rq.total >= 2, `复习队列到期词 ≥2（实际 ${rq.total}）`)
+    const mine = rq.items.filter((i) => i.wordId === q[0] || i.wordId === q[1])
+    assert(mine.length === 2 && mine.every((i) => i.reason === 'relearn'), '薄弱分组：无批改记录归「需要重新理解」')
+    hooks.review.graduate(q[0])
+    assert(hooks.review.queue().items.every((i) => i.wordId !== q[0]), '毕业出队（不再出现在到期队列）')
+    hooks.review.tape(q[1])
+    assert(hooks.review.queue().items.every((i) => i.wordId !== q[1]), '胶带 = 明天再来（今日到期消失）')
+    hooks.review.graduate(q[1])
+    assert(hooks.review.queue().items.every((i) => i.wordId !== q[0] && i.wordId !== q[1]), '种子已清理')
+
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })
     await new Promise((r) => setTimeout(r, 500))
@@ -262,13 +284,27 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     const detailShot = await win.webContents.capturePage()
     fs.writeFileSync(path.join(selftestDir, 'm2-word.png'), detailShot.toPNG())
 
-    // 11. 截图：今日学习 + 单词学习会话
+    // 11. 截图：今日学习 + 单词学习会话 + 复习 + 练习中心
     await win.webContents.executeJavaScript("location.hash = '#/today'")
     await new Promise((r) => setTimeout(r, 1000))
     fs.writeFileSync(path.join(selftestDir, 'm3-today.png'), (await win.webContents.capturePage()).toPNG())
     await win.webContents.executeJavaScript("location.hash = '#/today/study'")
     await new Promise((r) => setTimeout(r, 1000))
     fs.writeFileSync(path.join(selftestDir, 'm3-study.png'), (await win.webContents.capturePage()).toPNG())
+    hooks.review.seed(q[0], '2026-10-04')
+    hooks.review.seed(q[1], '2026-10-04')
+    await win.webContents.executeJavaScript("location.hash = '#/today/review'")
+    await new Promise((r) => setTimeout(r, 1200))
+    const reviewText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/复习|造句|毕业|返回今日学习/.test(reviewText), '复习页渲染出内容（DOM 文本断言）')
+    fs.writeFileSync(path.join(selftestDir, 'm4-review.png'), (await win.webContents.capturePage()).toPNG())
+    hooks.review.graduate(q[0])
+    hooks.review.graduate(q[1])
+    await win.webContents.executeJavaScript("location.hash = '#/today/practice'")
+    await new Promise((r) => setTimeout(r, 800))
+    const practiceText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/单词练习|中译英|语境选词|自由表达/.test(practiceText), '练习中心渲染出内容（DOM 文本断言）')
+    fs.writeFileSync(path.join(selftestDir, 'm4-practice.png'), (await win.webContents.capturePage()).toPNG())
     console.log('[lexiflow] selftest screenshots saved')
 
     console.log('[lexiflow] selftest OK')

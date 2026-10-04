@@ -164,6 +164,43 @@ export interface TodaySummary {
   reviewDue: number
   gradedToday: number
   dailyNew: number
+  practicedToday: number
+}
+
+/* ── 复习巩固 + 单词练习（M4） ─────────────── */
+
+export type ReviewReason = 'relearn' | 'usage' | 'collocation' | 'transfer'
+
+export interface ReviewItem {
+  wordId: number
+  headword: string
+  reason: ReviewReason
+}
+
+export interface ReviewQueueResult {
+  items: ReviewItem[]
+  counts: Record<ReviewReason, number>
+  total: number
+}
+
+export type PracticeType = 'translate' | 'free' | 'redo' | 'context' | 'collocation' | 'synonym'
+
+export interface McqQuestion {
+  stem: string
+  options: string[]
+  answer: number
+  explanation: string
+}
+
+export interface McqResponse extends McqQuestion {
+  word: string
+  cached: boolean
+}
+
+export interface PracticePoolItem {
+  wordId: number
+  headword: string
+  sentence?: string
 }
 
 export interface ExplainResult {

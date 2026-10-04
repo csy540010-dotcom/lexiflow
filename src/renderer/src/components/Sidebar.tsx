@@ -26,7 +26,7 @@ export default function Sidebar(): React.JSX.Element {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-foot">v0.1.0 · M2</div>
+      <div className="sidebar-foot">v0.1.0 · M3</div>
     </aside>
   )
 }

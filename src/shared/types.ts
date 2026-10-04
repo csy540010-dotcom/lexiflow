@@ -133,3 +133,54 @@ export interface ImportResult extends ImportPreview {
   skippedWords: number
 }
 
+/* ── 学习（M3） ─────────────────────── */
+
+export interface GradeScores {
+  usage: number
+  grammar: number
+  collocation: number
+  naturalness: number
+}
+
+export interface GradeIssue {
+  original: string
+  why: string
+  fix: string
+}
+
+export interface GradePayload {
+  scores: GradeScores
+  revised: string
+  issues: GradeIssue[]
+  comment: string
+}
+
+export interface TodaySummary {
+  bookId: number
+  bookName: string
+  totalWords: number
+  learnedWords: number
+  newRemaining: number
+  reviewDue: number
+  gradedToday: number
+  dailyNew: number
+}
+
+export interface ExplainResult {
+  content: string
+  cached: boolean
+}
+
+export interface GradeResponse {
+  grade: GradePayload
+  word: WordDetailData | null
+}
+
+export interface CustomTaskItem {
+  id: number
+  kind: string
+  title: string
+  target: string
+  doneToday: boolean
+}
+

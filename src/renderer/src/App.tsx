@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Today from './pages/Today'
+import StudySession from './pages/StudySession'
 import Training from './pages/Training'
 import Reading from './pages/Reading'
 import Music from './pages/Music'
@@ -26,6 +27,7 @@ export default function App(): React.JSX.Element {
         <Routes>
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<Today />} />
+          <Route path="/today/study" element={<StudySession />} />
           <Route path="/training" element={<Training />} />
           <Route path="/reading" element={<Reading />} />
           <Route path="/music" element={<Music />} />

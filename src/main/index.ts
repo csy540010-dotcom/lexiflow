@@ -1,7 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain, safeStorage, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
-import { getDb, dbFilePath, kvGet, kvSet } from './db'
-import { normalizeAi, aiConfigProblem, chatCompletion, presetDefaults } from './ai'
+import { getDb, dbFilePath } from './db'
 import { ensureDictionaryImported, ensureBuiltinBooks } from './dictionary'
 import {
   listBooks,
@@ -15,141 +14,22 @@ import {
   type WordQueryArgs
 } from './library'
 import { detectObsidianData, importObsidianData, removeImportedBooks } from './import-obsidian'
-import type { AppSettings, SettingsPatch, AiTestResult, WordUpdatePatch } from '../shared/types'
+import { loadSettings, saveSettingsPatch, saveAiKey, storedKey, testAi } from './settings'
+import { applyGradeToMastery, masteryAverage, type GradeScores } from './mastery'
+import {
+  todaySummary,
+  todayQueue,
+  explainWord,
+  gradeSentence,
+  selectBook,
+  selectedBookId,
+  listTasks,
+  addTask,
+  removeTask,
+  toggleTask
+} from './study'
+import type { AppSettings, SettingsPatch, AiTestResult, WordUpdatePatch, SettingsPatch as Patch } from '../shared/types'
 import { runSelfTest } from './selftest'
-
-const KEY_ENC_KEY = 'ai_key_enc'
-const KEY_PLAIN_KEY = 'ai_key_plain_fallback'
-const SETTINGS_KEY = 'app_settings'
-
-interface StoredSettings {
-  ai: { preset: string; baseUrl: string; model: string }
-  plan: { dailyNew: number; dailyReviewLimit: number; dailyMinutes: number; reviewIntensity: number }
-  appearance: { theme: 'light' | 'dark' | 'system' }
-}
-
-const DEFAULT_SETTINGS: StoredSettings = {
-  ai: { preset: 'custom', baseUrl: '', model: '' },
-  plan: { dailyNew: 20, dailyReviewLimit: 50, dailyMinutes: 60, reviewIntensity: 3 },
-  appearance: { theme: 'light' }
-}
-
-function storedSettings(): StoredSettings {
-  const raw = kvGet(SETTINGS_KEY)
-  if (!raw) return structuredClone(DEFAULT_SETTINGS)
-  try {
-    const parsed = JSON.parse(raw) as Partial<StoredSettings>
-    return {
-      ai: { ...DEFAULT_SETTINGS.ai, ...(parsed.ai ?? {}) },
-      plan: { ...DEFAULT_SETTINGS.plan, ...(parsed.plan ?? {}) },
-      appearance: { ...DEFAULT_SETTINGS.appearance, ...(parsed.appearance ?? {}) }
-    }
-  } catch {
-    return structuredClone(DEFAULT_SETTINGS)
-  }
-}
-
-function maskKey(plain: string): string {
-  if (!plain) return ''
-  return plain.length <= 4 ? '••••' : '••••' + plain.slice(-4)
-}
-
-function storedKey(): string {
-  const enc = kvGet(KEY_ENC_KEY)
-  if (enc) {
-    if (safeStorage.isEncryptionAvailable()) {
-      try {
-        return safeStorage.decryptString(Buffer.from(enc, 'base64'))
-      } catch {
-        return ''
-      }
-    }
-    return ''
-  }
-  return kvGet(KEY_PLAIN_KEY) ?? ''
-}
-
-function saveAiKey(plain: string): void {
-  if (!plain) {
-    kvSet(KEY_ENC_KEY, '')
-    kvSet(KEY_PLAIN_KEY, '')
-    return
-  }
-  if (safeStorage.isEncryptionAvailable()) {
-    kvSet(KEY_ENC_KEY, safeStorage.encryptString(plain).toString('base64'))
-    kvSet(KEY_PLAIN_KEY, '')
-  } else {
-    kvSet(KEY_PLAIN_KEY, plain)
-  }
-}
-
-function loadSettings(): AppSettings {
-  const stored = storedSettings()
-  const plain = storedKey()
-  let sqliteVersion = ''
-  try {
-    sqliteVersion = (
-      getDb().prepare('SELECT sqlite_version() AS v').get() as { v: string }
-    ).v
-  } catch {
-    sqliteVersion = ''
-  }
-  return {
-    ai: {
-      preset: stored.ai.preset,
-      baseUrl: stored.ai.baseUrl,
-      model: stored.ai.model,
-      hasKey: Boolean(plain),
-      keyMasked: maskKey(plain)
-    },
-    plan: stored.plan,
-    appearance: stored.appearance,
-    about: {
-      appVersion: app.getVersion(),
-      electronVersion: process.versions.electron ?? '',
-      sqliteVersion
-    }
-  }
-}
-
-function saveSettingsPatch(patch: SettingsPatch): AppSettings {
-  const current = storedSettings()
-  if (patch.ai) {
-    const next = { ...current.ai, ...patch.ai }
-    // 切换服务商时带入该预设的默认地址与模型（与插件行为一致，仍可手改）。
-    if (patch.ai.preset && patch.ai.preset !== current.ai.preset) {
-      const defaults = presetDefaults(patch.ai.preset)
-      next.baseUrl = defaults.baseUrl
-      next.model = defaults.model
-    }
-    current.ai = next
-  }
-  if (patch.plan) current.plan = { ...current.plan, ...patch.plan }
-  if (patch.appearance) current.appearance = { ...current.appearance, ...patch.appearance }
-  kvSet(SETTINGS_KEY, JSON.stringify(current))
-  return loadSettings()
-}
-
-async function testAi(cfg?: Partial<{ preset: string; baseUrl: string; apiKey: string; model: string }>): Promise<AiTestResult> {
-  try {
-    const merged = normalizeAi({
-      preset: cfg?.preset ?? storedSettings().ai.preset,
-      baseUrl: cfg?.baseUrl ?? storedSettings().ai.baseUrl,
-      model: cfg?.model ?? storedSettings().ai.model,
-      apiKey: cfg?.apiKey ?? storedKey()
-    })
-    const problem = aiConfigProblem(merged)
-    if (problem) return { ok: false, error: problem }
-    const reply = await chatCompletion(
-      merged,
-      [{ role: 'user', content: '连接测试：请原样回复 OK' }],
-      { maxTokens: 16, timeoutMs: 30_000 }
-    )
-    return { ok: true, reply: reply.slice(0, 80) }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -204,7 +84,7 @@ app.whenReady().then(() => {
     sqliteVersion: (getDb().prepare('SELECT sqlite_version() AS v').get() as { v: string }).v,
     dbPath: dbFilePath()
   }))
-  ipcMain.handle('settings:get', () => loadSettings())
+  ipcMain.handle('settings:get', (): AppSettings => loadSettings())
   ipcMain.handle('settings:save', (_e, patch: SettingsPatch) => saveSettingsPatch(patch))
   ipcMain.handle('ai:key:set', (_e, key: string) => {
     saveAiKey(String(key ?? '').trim())
@@ -233,6 +113,17 @@ app.whenReady().then(() => {
     return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
   })
 
+  ipcMain.handle('study:summary', (_e, bookId?: number) => todaySummary(bookId ? Number(bookId) : undefined))
+  ipcMain.handle('study:queue', (_e, bookId?: number) => todayQueue(bookId ? Number(bookId) : undefined))
+  ipcMain.handle('study:selectBook', (_e, bookId: number) => selectBook(Number(bookId)))
+  ipcMain.handle('study:selectedBook', () => selectedBookId())
+  ipcMain.handle('study:explain', (_e, wordId: number) => explainWord(Number(wordId)))
+  ipcMain.handle('study:submit', (_e, wordId: number, sentence: string) => gradeSentence(Number(wordId), String(sentence ?? '')))
+  ipcMain.handle('tasks:list', () => listTasks())
+  ipcMain.handle('tasks:add', (_e, kind: string, title: string, target: string) => addTask(String(kind ?? 'custom'), String(title ?? ''), String(target ?? '')))
+  ipcMain.handle('tasks:remove', (_e, id: number) => removeTask(Number(id)))
+  ipcMain.handle('tasks:toggle', (_e, id: number, done: boolean) => toggleTask(Number(id), Boolean(done)))
+
   const win = createWindow()
   console.log('[lexiflow] window created, db ready')
 
@@ -259,7 +150,14 @@ app.whenReady().then(() => {
         detect: detectObsidianData,
         run: importObsidianData,
         cleanup: removeImportedBooks
-      }
+      },
+      study: {
+        summary: todaySummary,
+        queue: todayQueue,
+        selectBook,
+        tasks: { list: listTasks, add: addTask, toggle: toggleTask, remove: removeTask }
+      },
+      mastery: { applyGradeToMastery, average: masteryAverage }
     })
   }
 })
@@ -267,3 +165,6 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+
+// 保持 Patch 类型引用（设置补丁在 settings.ts 内实现）
+void (0 as unknown as Patch | undefined)

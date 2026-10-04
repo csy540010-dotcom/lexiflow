@@ -75,6 +75,20 @@ function migrate(db: Database.Database): void {
       payload TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS custom_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL DEFAULT 'custom',
+      title TEXT NOT NULL,
+      target TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS task_logs (
+      task_id INTEGER NOT NULL REFERENCES custom_tasks(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      UNIQUE(task_id, date)
+    );
   `)
 }
 

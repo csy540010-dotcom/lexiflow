@@ -10,7 +10,11 @@ import type {
   WordQueryArgs,
   WordUpdatePatch,
   ImportPreview,
-  ImportResult
+  ImportResult,
+  TodaySummary,
+  ExplainResult,
+  GradeResponse,
+  CustomTaskItem
 } from '../shared/types'
 
 const api = {
@@ -34,7 +38,20 @@ const api = {
 
   importDetect: (dir: string): Promise<ImportPreview> => ipcRenderer.invoke('import:obsidian:detect', dir),
   importRun: (dir: string): Promise<ImportResult> => ipcRenderer.invoke('import:obsidian:run', dir),
-  pickDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickDir')
+  pickDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickDir'),
+
+  studySummary: (bookId?: number): Promise<TodaySummary> => ipcRenderer.invoke('study:summary', bookId),
+  studyQueue: (bookId?: number): Promise<number[]> => ipcRenderer.invoke('study:queue', bookId),
+  selectBook: (bookId: number): Promise<void> => ipcRenderer.invoke('study:selectBook', bookId),
+  selectedBook: (): Promise<number | null> => ipcRenderer.invoke('study:selectedBook'),
+  explainWord: (wordId: number): Promise<ExplainResult> => ipcRenderer.invoke('study:explain', wordId),
+  gradeSentence: (wordId: number, sentence: string): Promise<GradeResponse> =>
+    ipcRenderer.invoke('study:submit', wordId, sentence),
+  listTasks: (): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:list'),
+  addTask: (kind: string, title: string, target: string): Promise<CustomTaskItem[]> =>
+    ipcRenderer.invoke('tasks:add', kind, title, target),
+  removeTask: (id: number): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:remove', id),
+  toggleTask: (id: number, done: boolean): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:toggle', id, done)
 }
 
 export type LexiApi = typeof api

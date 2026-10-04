@@ -1,7 +1,20 @@
 import type { BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { AppSettings, SettingsPatch, AiTestResult, ImportPreview, ImportResult, WordListResult, WordDetailData, BookSummary } from '../shared/types'
+import type {
+  AppSettings,
+  SettingsPatch,
+  AiTestResult,
+  ImportPreview,
+  ImportResult,
+  WordListResult,
+  WordDetailData,
+  BookSummary,
+  TodaySummary,
+  CustomTaskItem,
+  MasteryData,
+  GradeScores
+} from '../shared/types'
 
 interface LibraryHooks {
   listBooks: () => BookSummary[]
@@ -18,6 +31,25 @@ interface ImportHooks {
   cleanup: (slugs: string[]) => number
 }
 
+interface TaskHooks {
+  list: () => CustomTaskItem[]
+  add: (kind: string, title: string, target: string) => CustomTaskItem[]
+  toggle: (id: number, done: boolean) => CustomTaskItem[]
+  remove: (id: number) => CustomTaskItem[]
+}
+
+interface StudyHooks {
+  summary: (bookId?: number) => TodaySummary
+  queue: (bookId?: number) => number[]
+  selectBook: (bookId: number) => void
+  tasks: TaskHooks
+}
+
+interface MasteryHooks {
+  applyGradeToMastery: (prev: MasteryData, g: GradeScores) => MasteryData
+  average: (m: MasteryData) => number
+}
+
 export interface SelfTestHooks {
   loadSettings: () => AppSettings
   saveSettingsPatch: (patch: SettingsPatch) => AppSettings
@@ -26,6 +58,8 @@ export interface SelfTestHooks {
   storedKey: () => string
   library: LibraryHooks
   import: ImportHooks
+  study: StudyHooks
+  mastery: MasteryHooks
 }
 
 function assert(cond: boolean, label: string): void {
@@ -144,6 +178,30 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
       console.log('[lexiflow] selftest 真实库不存在，跳过真实数据检测')
     }
 
+    // 9.5 掌握度规则
+    const m1 = hooks.mastery.applyGradeToMastery({}, { usage: 4, grammar: 5, collocation: 3, naturalness: 4 })
+    assert(m1.recognition === 1 && m1.comprehension === 4 && m1.production === 4 && m1.transfer === 4,
+      `掌握度规则（首评 4/5/3/4 → 识别${m1.recognition} 理解${m1.comprehension} 使用${m1.production} 迁移${m1.transfer}）`)
+    const m2 = hooks.mastery.applyGradeToMastery(m1, { usage: 2, grammar: 2, collocation: 2, naturalness: 2 })
+    assert(m2.recognition === 2 && m2.production === 4 && m2.transfer === 4, '掌握度只升不降')
+    assert(hooks.mastery.average({ recognition: 5, comprehension: 5, production: 5, transfer: 5 }) === 5, '掌握度均分')
+
+    // 9.6 今日学习：摘要 / 队列 / 自定义任务
+    hooks.study.selectBook(hooks.library.listBooks().find((b) => b.slug === 'cet4')!.id)
+    const sum = hooks.study.summary()
+    assert(sum.bookName === '大学英语四级词书' && sum.newRemaining === 20 && sum.totalWords === 4544,
+      `今日摘要（新词 ${sum.newRemaining} / 全书 ${sum.totalWords}）`)
+    const q = hooks.study.queue()
+    assert(q.length === 20, `今日队列 20 词（实际 ${q.length}）`)
+    let tasks = hooks.study.tasks.add('reading', '六级阅读', '1 篇')
+    assert(tasks.length === 1 && tasks[0].doneToday === false, '自定义任务：添加')
+    tasks = hooks.study.tasks.toggle(tasks[0].id, true)
+    assert(tasks[0].doneToday === true, '自定义任务：打卡')
+    tasks = hooks.study.tasks.toggle(tasks[0].id, false)
+    assert(tasks[0].doneToday === false, '自定义任务：取消打卡')
+    tasks = hooks.study.tasks.remove(tasks[0].id)
+    assert(tasks.length === 0, '自定义任务：删除')
+
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })
     await new Promise((r) => setTimeout(r, 500))
@@ -161,6 +219,14 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     await new Promise((r) => setTimeout(r, 900))
     const detailShot = await win.webContents.capturePage()
     fs.writeFileSync(path.join(selftestDir, 'm2-word.png'), detailShot.toPNG())
+
+    // 11. 截图：今日学习 + 单词学习会话
+    await win.webContents.executeJavaScript("location.hash = '#/today'")
+    await new Promise((r) => setTimeout(r, 1000))
+    fs.writeFileSync(path.join(selftestDir, 'm3-today.png'), (await win.webContents.capturePage()).toPNG())
+    await win.webContents.executeJavaScript("location.hash = '#/today/study'")
+    await new Promise((r) => setTimeout(r, 1000))
+    fs.writeFileSync(path.join(selftestDir, 'm3-study.png'), (await win.webContents.capturePage()).toPNG())
     console.log('[lexiflow] selftest screenshots saved')
 
     console.log('[lexiflow] selftest OK')

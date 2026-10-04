@@ -1,6 +1,6 @@
 {
   "name": "lexiflow",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "description": "LexiFlow —— 本地优先、自带 AI Key 的英语词汇学习桌面应用",
   "main": "out/main/index.js",
   "author": "csy540010-dotcom",
@@ -29,8 +29,10 @@
   "build": {
     "appId": "com.csy540010.lexiflow",
     "productName": "LexiFlow",
+    "artifactName": "LexiFlow-Setup-${version}.exe",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "out/**",
@@ -48,12 +50,16 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "unicode": true
+      "unicode": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LexiFlow"
     }
   }
 }

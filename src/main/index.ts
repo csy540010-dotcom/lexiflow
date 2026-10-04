@@ -61,6 +61,9 @@ import {
 protocol.registerSchemesAsPrivileged([
   { scheme: 'lexi-media', privileges: { stream: true, supportFetchAPI: true, bypassCSP: false } }
 ])
+
+// 固定数据目录为 %APPDATA%\lexiflow：无论开发版还是安装版都读写同一份学习数据
+app.setPath('userData', path.join(app.getPath('appData'), 'lexiflow'))
 import {
   todaySummary,
   todayQueue,

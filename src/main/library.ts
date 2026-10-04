@@ -222,6 +222,30 @@ export function updateWord(id: number, patch: WordUpdatePatch): WordDetailData |
   return getWord(id)
 }
 
+/** 把词条移动到另一本词书（学习记录随 word_id 保留）；目标书已有同词时报错。 */
+export function moveWordToBook(wordId: number, bookId: number): WordDetailData {
+  const db = getDb()
+  const word = db.prepare('SELECT id, headword, book_id FROM words WHERE id = ?').get(Number(wordId)) as
+    | { id: number; headword: string; book_id: number }
+    | undefined
+  if (!word) throw new Error('词条不存在。')
+  if (word.book_id === Number(bookId)) {
+    const same = getWord(wordId)
+    if (!same) throw new Error('词条不存在。')
+    return same
+  }
+  const target = db.prepare('SELECT id FROM books WHERE id = ?').get(Number(bookId))
+  if (!target) throw new Error('目标词书不存在。')
+  const conflict = db
+    .prepare('SELECT id FROM words WHERE book_id = ? AND lower(headword) = lower(?)')
+    .get(Number(bookId), word.headword)
+  if (conflict) throw new Error(`「${word.headword}」已在目标词书中。`)
+  db.prepare('UPDATE words SET book_id = ? WHERE id = ?').run(Number(bookId), Number(wordId))
+  const moved = getWord(wordId)
+  if (!moved) throw new Error('词条不存在。')
+  return moved
+}
+
 export function addWord(bookId: number, headword: string): WordDetailData {
   const trimmed = headword.trim()
   if (!trimmed) throw new Error('请输入单词。')

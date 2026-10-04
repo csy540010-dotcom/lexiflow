@@ -494,6 +494,8 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     await new Promise((r) => setTimeout(r, 900))
     const detailShot = await win.webContents.capturePage()
     fs.writeFileSync(path.join(selftestDir, 'm2-word.png'), detailShot.toPNG())
+    const detailText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/释义与用法|例句|切换词书/.test(detailText), '单词详情渲染出内容（词汇参考标签，DOM 文本断言）')
 
     // 11. 截图：今日学习 + 单词学习会话 + 复习 + 练习中心
     await win.webContents.executeJavaScript("location.hash = '#/today'")
@@ -535,7 +537,7 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     await win.webContents.executeJavaScript("location.hash = '#/music'")
     await new Promise((r) => setTimeout(r, 900))
     const musicText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
-    assert(/音乐听力|导入 MP3/.test(musicText), '听力页渲染出内容（DOM 文本断言）')
+    assert(/听力|导入 MP3/.test(musicText), '听力页渲染出内容（DOM 文本断言）')
     fs.writeFileSync(path.join(selftestDir, 'm6-music.png'), (await win.webContents.capturePage()).toPNG())
     console.log('[lexiflow] selftest screenshots saved')
 

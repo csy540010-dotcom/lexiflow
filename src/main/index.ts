@@ -13,6 +13,7 @@ import {
   queryWords,
   getWord,
   updateWord,
+  moveWordToBook,
   addWord,
   type WordQueryArgs
 } from './library'
@@ -188,6 +189,7 @@ app.whenReady().then(() => {
   ipcMain.handle('library:words:query', (_e, args: WordQueryArgs) => queryWords(args))
   ipcMain.handle('library:words:get', (_e, id: number) => getWord(Number(id)))
   ipcMain.handle('library:words:update', (_e, id: number, patch: WordUpdatePatch) => updateWord(Number(id), patch))
+  ipcMain.handle('library:words:move', (_e, id: number, bookId: number) => moveWordToBook(Number(id), Number(bookId)))
   ipcMain.handle('library:words:add', (_e, bookId: number, headword: string) => addWord(Number(bookId), String(headword ?? '')))
 
   ipcMain.handle('import:obsidian:detect', (_e, dir: string) => detectObsidianData(String(dir ?? '')))
@@ -298,6 +300,7 @@ app.whenReady().then(() => {
         queryWords,
         getWord,
         updateWord,
+        move: moveWordToBook,
         createBook,
         deleteBook
       },

@@ -44,6 +44,8 @@ const api = {
   getWord: (id: number): Promise<WordDetailData | null> => ipcRenderer.invoke('library:words:get', id),
   updateWord: (id: number, patch: WordUpdatePatch): Promise<WordDetailData | null> =>
     ipcRenderer.invoke('library:words:update', id, patch),
+  moveWordToBook: (id: number, bookId: number): Promise<WordDetailData> =>
+    ipcRenderer.invoke('library:words:move', id, bookId),
   addWord: (bookId: number, headword: string): Promise<WordDetailData> =>
     ipcRenderer.invoke('library:words:add', bookId, headword),
 

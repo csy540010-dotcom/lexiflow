@@ -194,168 +194,191 @@ export default function Music(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="card player-card">
-          <div className="player-head">
-            <div className="cover-tile" aria-hidden="true">
-              ♫
-            </div>
-            <div className="player-head-main">
-              <h3 className="player-title">{selected.title}</h3>
-              <p className="stub-note">{playing ? '播放中 · 计入听力时间' : '已暂停'}</p>
-            </div>
-          </div>
-          <audio
-            ref={audioRef}
-            src={src}
-            preload="metadata"
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-            onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
-            onLoadedMetadata={(e) => {
-              setDuration(e.currentTarget.duration || 0)
-              e.currentTarget.playbackRate = speed
-            }}
-            onError={() => setError('音频加载失败，请删除后重新导入。')}
-          />
-
-          <div className="player-progress">
-            <span className="player-time">{fmtTime(current)}</span>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(1, duration)}
-              step={1}
-              value={Math.min(current, duration)}
-              onChange={(e) => seek(Number(e.target.value))}
-            />
-            <span className="player-time">{fmtTime(duration)}</span>
-          </div>
-
-          <div className="player-controls">
-            <button className="btn btn-ghost btn-sm" onClick={() => seek(current - 15)}>
-              ↺ 15s
-            </button>
-            <button className="btn player-play" onClick={togglePlay}>
-              {playing ? '⏸ 暂停' : '▶ 播放'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => seek(current + 30)}>
-              30s ↻
-            </button>
-            <select value={speed} onChange={(e) => changeSpeed(Number(e.target.value))} className="speed-select">
-              {SPEEDS.map((s) => (
-                <option key={s} value={s}>
-                  {s.toFixed(2).replace(/0$/, '')}x
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="card module-card" style={{ marginTop: 16 }}>
-          <div className="card-head-row">
-            <div className="chips" style={{ margin: 0 }}>
-              <button className={'chip' + (tab === 'raw' ? ' chip-active' : '')} onClick={() => setTab('raw')}>
-                原文
+        <div className="music-layout">
+          <aside className="card music-playlist">
+            <p className="playlist-title">听力库（{tracks.length}）</p>
+            {tracks.map((t) => (
+              <button
+                key={t.id}
+                className={'playlist-item' + (t.id === selected.id ? ' active' : '')}
+                onClick={() => selectTrack(t)}
+              >
+                <span className="playlist-item-title">♫ {t.title}</span>
+                <span className="playlist-item-meta">
+                  {t.textContent ? '有文本' : '缺文本'}
+                  {t.segments.length > 0 ? ` · 整理 ${t.segments.length} 段` : ''}
+                  {t.notes ? ' · 有笔记' : ''}
+                </span>
               </button>
-              <button className={'chip' + (tab === 'organized' ? ' chip-active' : '')} onClick={() => setTab('organized')}>
-                AI 整理{selected.segments.length > 0 ? `（${selected.segments.length}）` : ''}
-              </button>
-              <button className={'chip' + (tab === 'words' ? ' chip-active' : '')} onClick={() => void openWordsTab()}>
-                生词
-              </button>
-              <button className={'chip' + (tab === 'notes' ? ' chip-active' : '')} onClick={() => setTab('notes')}>
-                笔记
-              </button>
-            </div>
-            {tab === 'raw' && (
-              <button className="btn btn-sm" disabled={busy || !textDraft.trim()} onClick={() => void organize()}>
-                {busy ? '整理中…' : 'AI 整理文本'}
-              </button>
-            )}
-          </div>
-
-          {tab === 'raw' && (
-            <>
-              <p className="section-note">粘贴或修改对应文本，再点「AI 整理文本」清理格式、分段分句。</p>
-              <textarea
-                className="notes-area"
-                style={{ minHeight: 180 }}
-                value={textDraft}
-                onChange={(e) => setTextDraft(e.target.value)}
-                placeholder="把这段音频的原文粘贴到这里（也可以只放字幕文本）…"
-              />
-              <div className="btn-row">
-                <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void saveText()}>
-                  保存文本
-                </button>
-              </div>
-            </>
-          )}
-
-          {tab === 'organized' &&
-            (selected.segments.length === 0 ? (
-              <p className="stub-note">还没有整理结果。先切到「原文」贴上文本，再点右上角「AI 整理文本」。</p>
-            ) : (
-              <ol className="segment-list">
-                {selected.segments.map((seg, i) => (
-                  <li key={i} className="segment-item">
-                    <span className="segment-index">{i + 1}</span>
-                    <p>{seg}</p>
-                  </li>
-                ))}
-              </ol>
             ))}
+          </aside>
 
-          {tab === 'words' && (
-            <>
-              <p className="section-note">从这段文本里析出词典收录的单词（按出现顺序），点「加入」放进当前词书。</p>
-              {wordsBusy ? (
-                <p className="stub-note">正在析出…</p>
-              ) : !words || words.length === 0 ? (
-                <p className="stub-note">没有可析出的单词——先导入或粘贴文本。</p>
-              ) : (
-                <div className="music-word-list">
-                  {words.map((w) => (
-                    <div key={w.word} className="music-word-row">
-                      <div className="music-word-main">
-                        <span className="word-row-head">{w.word}</span>
-                        <span className="music-word-phonetic">{w.phonetic}</span>
-                        <span className="word-row-meaning">{w.meaning}</span>
-                      </div>
-                      {w.inBook ? (
-                        <span className="task-tag task-tag-done">✓ 已在词库</span>
-                      ) : (
-                        <button className="btn btn-sm btn-ghost" onClick={() => void addWordFromList(w.word)}>
-                          加入
-                        </button>
-                      )}
-                    </div>
-                  ))}
+          <div className="music-main">
+            <div className="card player-card">
+              <div className="player-head">
+                <div className="cover-tile cover-tile-lg" aria-hidden="true">
+                  ♫
                 </div>
-              )}
-            </>
-          )}
-
-          {tab === 'notes' && (
-            <>
-              <p className="section-note">这段听力的笔记（自动保存）：生词、听不出的连读、复述要点…</p>
-              <textarea
-                className="notes-area"
-                style={{ minHeight: 160 }}
-                value={notesDraft}
-                onChange={(e) => saveNotes(e.target.value)}
-                placeholder="写下听力笔记…自动保存"
+                <div className="player-head-main">
+                  <h3 className="player-title">{selected.title}</h3>
+                  <p className="stub-note">{playing ? '播放中 · 计入听力时间' : '已暂停'}</p>
+                  <p className="stub-note">导入于 {selected.createdAt.slice(0, 10)}</p>
+                </div>
+              </div>
+              <audio
+                ref={audioRef}
+                src={src}
+                preload="metadata"
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
+                onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
+                onLoadedMetadata={(e) => {
+                  setDuration(e.currentTarget.duration || 0)
+                  e.currentTarget.playbackRate = speed
+                }}
+                onError={() => setError('音频加载失败，请删除后重新导入。')}
               />
-            </>
-          )}
 
-          {error && (
-            <p className="status-line status-err">
-              {error}
-              {/配置/.test(error) && '（设置 → AI 配置）'}
-            </p>
-          )}
+              <div className="player-progress">
+                <span className="player-time">{fmtTime(current)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(1, duration)}
+                  step={1}
+                  value={Math.min(current, duration)}
+                  onChange={(e) => seek(Number(e.target.value))}
+                />
+                <span className="player-time">{fmtTime(duration)}</span>
+              </div>
+
+              <div className="player-controls">
+                <button className="btn btn-ghost btn-sm" onClick={() => seek(current - 15)}>
+                  ↺ 15s
+                </button>
+                <button className="btn player-play" onClick={togglePlay}>
+                  {playing ? '⏸ 暂停' : '▶ 播放'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => seek(current + 30)}>
+                  30s ↻
+                </button>
+                <select value={speed} onChange={(e) => changeSpeed(Number(e.target.value))} className="speed-select">
+                  {SPEEDS.map((s) => (
+                    <option key={s} value={s}>
+                      {s.toFixed(2).replace(/0$/, '')}x
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="card module-card" style={{ marginTop: 16 }}>
+              <div className="card-head-row">
+                <div className="chips" style={{ margin: 0 }}>
+                  <button className={'chip' + (tab === 'raw' ? ' chip-active' : '')} onClick={() => setTab('raw')}>
+                    原文
+                  </button>
+                  <button className={'chip' + (tab === 'organized' ? ' chip-active' : '')} onClick={() => setTab('organized')}>
+                    AI 整理{selected.segments.length > 0 ? `（${selected.segments.length}）` : ''}
+                  </button>
+                  <button className={'chip' + (tab === 'words' ? ' chip-active' : '')} onClick={() => void openWordsTab()}>
+                    生词
+                  </button>
+                  <button className={'chip' + (tab === 'notes' ? ' chip-active' : '')} onClick={() => setTab('notes')}>
+                    笔记
+                  </button>
+                </div>
+                {tab === 'raw' && (
+                  <button className="btn btn-sm" disabled={busy || !textDraft.trim()} onClick={() => void organize()}>
+                    {busy ? '整理中…' : 'AI 整理文本'}
+                  </button>
+                )}
+              </div>
+
+              {tab === 'raw' && (
+                <>
+                  <p className="section-note">粘贴或修改对应文本，再点「AI 整理文本」清理格式、分段分句。</p>
+                  <textarea
+                    className="notes-area"
+                    style={{ minHeight: 180 }}
+                    value={textDraft}
+                    onChange={(e) => setTextDraft(e.target.value)}
+                    placeholder="把这段音频的原文粘贴到这里（也可以只放字幕文本）…"
+                  />
+                  <div className="btn-row">
+                    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void saveText()}>
+                      保存文本
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {tab === 'organized' &&
+                (selected.segments.length === 0 ? (
+                  <p className="stub-note">还没有整理结果。先切到「原文」贴上文本，再点右上角「AI 整理文本」。</p>
+                ) : (
+                  <ol className="segment-list">
+                    {selected.segments.map((seg, i) => (
+                      <li key={i} className="segment-item">
+                        <span className="segment-index">{i + 1}</span>
+                        <p>{seg}</p>
+                      </li>
+                    ))}
+                  </ol>
+                ))}
+
+              {tab === 'words' && (
+                <>
+                  <p className="section-note">从这段文本里析出词典收录的单词（按出现顺序），点「加入」放进当前词书。</p>
+                  {wordsBusy ? (
+                    <p className="stub-note">正在析出…</p>
+                  ) : !words || words.length === 0 ? (
+                    <p className="stub-note">没有可析出的单词——先导入或粘贴文本。</p>
+                  ) : (
+                    <div className="music-word-list">
+                      {words.map((w) => (
+                        <div key={w.word} className="music-word-row">
+                          <div className="music-word-main">
+                            <span className="word-row-head">{w.word}</span>
+                            <span className="music-word-phonetic">{w.phonetic}</span>
+                            <span className="word-row-meaning">{w.meaning}</span>
+                          </div>
+                          {w.inBook ? (
+                            <span className="task-tag task-tag-done">✓ 已在词库</span>
+                          ) : (
+                            <button className="btn btn-sm btn-ghost" onClick={() => void addWordFromList(w.word)}>
+                              加入
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {tab === 'notes' && (
+                <>
+                  <p className="section-note">这段听力的笔记（自动保存）：生词、听不出的连读、复述要点…</p>
+                  <textarea
+                    className="notes-area"
+                    style={{ minHeight: 160 }}
+                    value={notesDraft}
+                    onChange={(e) => saveNotes(e.target.value)}
+                    placeholder="写下听力笔记…自动保存"
+                  />
+                </>
+              )}
+
+              {error && (
+                <p className="status-line status-err">
+                  {error}
+                  {/配置/.test(error) && '（设置 → AI 配置）'}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {toast && <div className="toast">{toast}</div>}
@@ -368,8 +391,8 @@ export default function Music(): React.JSX.Element {
     <section>
       <div className="page-head">
         <div>
-          <h1 className="page-title">音乐听力</h1>
-          <p className="page-sub">面向英语学习的音乐 / 播客播放器——导入 MP3 + 对应文本</p>
+          <h1 className="page-title">听力</h1>
+          <p className="page-sub">导入 MP3 + 对应文本的播放器式听力助手</p>
         </div>
         <button className="btn" onClick={() => void importAudio()}>
           导入 MP3
@@ -385,13 +408,18 @@ export default function Music(): React.JSX.Element {
           <div className="article-list">
             {tracks.map((t) => (
               <div key={t.id} className="article-row" onClick={() => selectTrack(t)}>
-                <div className="article-row-main">
-                  <span className="article-row-title">♫ {t.title}</span>
-                  <span className="article-row-meta">
-                    {t.textContent ? '有文本' : '缺文本'}
-                    {t.segments.length > 0 ? ` · AI 整理 ${t.segments.length} 段` : ''}
-                    {t.notes ? ' · 有笔记' : ''} · {t.createdAt.slice(0, 10)}
+                <div className="track-row">
+                  <span className="cover-mini" aria-hidden="true">
+                    ♫
                   </span>
+                  <div className="article-row-main">
+                    <span className="article-row-title">{t.title}</span>
+                    <span className="article-row-meta">
+                      {t.textContent ? '有文本' : '缺文本'}
+                      {t.segments.length > 0 ? ` · AI 整理 ${t.segments.length} 段` : ''}
+                      {t.notes ? ' · 有笔记' : ''} · {t.createdAt.slice(0, 10)}
+                    </span>
+                  </div>
                 </div>
                 <button
                   className="text-btn task-remove"

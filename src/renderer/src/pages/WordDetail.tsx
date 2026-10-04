@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { SentenceFavoriteItem, WordDetailData, WordProfile } from '../../../shared/types'
+import type { BookSummary, SentenceFavoriteItem, WordDetailData, WordProfile } from '../../../shared/types'
 import MasteryDots from '../components/MasteryDots'
 
 const MASTERY_DIMS: Array<{ key: 'recognition' | 'comprehension' | 'production' | 'transfer'; label: string }> = [
@@ -12,14 +12,15 @@ const MASTERY_DIMS: Array<{ key: 'recognition' | 'comprehension' | 'production' 
 
 const STATUS_LABEL: Record<number, string> = { 0: '未学习', 1: '学习中', 2: '已掌握' }
 
-type ProfileTab = 'def' | 'ex' | 'coll' | 'rel' | 'forms'
+type DetailTab = 'def' | 'ex' | 'forms' | 'coll' | 'rel' | 'notes'
 
-const PROFILE_TABS: Array<{ id: ProfileTab; label: string }> = [
+const DETAIL_TABS: Array<{ id: DetailTab; label: string }> = [
   { id: 'def', label: '释义与用法' },
   { id: 'ex', label: '例句' },
+  { id: 'forms', label: '词形变化' },
   { id: 'coll', label: '搭配' },
   { id: 'rel', label: '相关词' },
-  { id: 'forms', label: '词形变化' }
+  { id: 'notes', label: '笔记' }
 ]
 
 function cachedProfile(word: WordDetailData): WordProfile | null {
@@ -29,10 +30,16 @@ function cachedProfile(word: WordDetailData): WordProfile | null {
   return p.profile ?? null
 }
 
+/** 从释义里取一个短标签（如「可爱的」）。 */
+function shortMeaning(meaning: string): string {
+  const core = meaning.replace(/^[a-z]+\.\s*/i, '').split(/[；;,，]/)[0].trim()
+  return core.slice(0, 12)
+}
+
 /** 系统朗读（Chromium 内置语音，离线可用）。 */
-function speak(word: string): void {
+function speak(text: string): void {
   try {
-    const u = new SpeechSynthesisUtterance(word)
+    const u = new SpeechSynthesisUtterance(text)
     u.lang = 'en-US'
     u.rate = 0.95
     window.speechSynthesis.cancel()
@@ -42,6 +49,29 @@ function speak(word: string): void {
   }
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 例句里把目标词高亮成绿色。 */
+function highlightWord(text: string, word: string): React.JSX.Element {
+  if (!word) return <>{text}</>
+  const parts = text.split(new RegExp('(' + escapeRegExp(word) + ')', 'gi'))
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.toLowerCase() === word.toLowerCase() ? (
+          <mark key={i} className="ex-mark">
+            {p}
+          </mark>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </>
+  )
+}
+
 export default function WordDetail(): React.JSX.Element {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -49,13 +79,15 @@ export default function WordDetail(): React.JSX.Element {
   const ids = (location.state as { ids?: number[] } | null)?.ids ?? null
 
   const [word, setWord] = useState<WordDetailData | null>(null)
+  const [books, setBooks] = useState<BookSummary[]>([])
   const [favs, setFavs] = useState<SentenceFavoriteItem[]>([])
   const [notes, setNotes] = useState('')
   const [toast, setToast] = useState('')
+  const [tab, setTab] = useState<DetailTab>('def')
   const [profile, setProfile] = useState<WordProfile | null>(null)
-  const [profileTab, setProfileTab] = useState<ProfileTab>('def')
   const [profileBusy, setProfileBusy] = useState(false)
   const [profileError, setProfileError] = useState('')
+  const [showBookPick, setShowBookPick] = useState(false)
   const notesTimer = useRef<number | undefined>(undefined)
 
   const load = useCallback(async (wordId: number): Promise<void> => {
@@ -65,11 +97,16 @@ export default function WordDetail(): React.JSX.Element {
     setFavs(await window.lexi.listFavorites(wordId))
     setProfile(w ? cachedProfile(w) : null)
     setProfileError('')
+    setShowBookPick(false)
   }, [])
 
   useEffect(() => {
     if (id) void load(Number(id))
   }, [id, load])
+
+  useEffect(() => {
+    void window.lexi.listBooks().then(setBooks)
+  }, [])
 
   function flash(msg: string): void {
     setToast(msg)
@@ -111,6 +148,19 @@ export default function WordDetail(): React.JSX.Element {
     }
   }
 
+  async function moveToBook(bookId: number): Promise<void> {
+    if (!word) return
+    try {
+      const moved = await window.lexi.moveWordToBook(word.id, bookId)
+      setWord(moved)
+      setShowBookPick(false)
+      const bookName = books.find((b) => b.id === bookId)?.name ?? '词书'
+      flash(`已移动到「${bookName}」`)
+    } catch (e) {
+      flash(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   async function generateProfile(): Promise<void> {
     if (!word) return
     setProfileBusy(true)
@@ -148,6 +198,7 @@ export default function WordDetail(): React.JSX.Element {
   }
 
   const idx = ids ? ids.indexOf(word.id) : -1
+  const tag = shortMeaning(word.meaning)
 
   return (
     <section>
@@ -174,18 +225,22 @@ export default function WordDetail(): React.JSX.Element {
             {word.favorite ? '★' : '☆'}
           </button>
         </div>
-        <p className="detail-phonetic">
+        <div className="detail-sub-row">
           <button className="speak-btn" title="朗读" onClick={() => speak(word.headword)}>
             🔊
           </button>
-          {word.phonetic || '（词典暂无音标）'}
+          <span className="detail-phonetic-text">{word.phonetic || '（词典暂无音标）'}</span>
+          {tag && <span className="meaning-tag">{tag}</span>}
           <span className="detail-status">{STATUS_LABEL[word.status]}</span>
           {word.dueDate && <span className="detail-due">复习到期 {word.dueDate}</span>}
-        </p>
+        </div>
         <p className="detail-meaning">{word.meaning || '（词典暂无释义）'}</p>
         <div className="btn-row">
           <button className="btn" onClick={() => void startStudy()}>
-            {word.status === 0 ? '加入今日学习' : word.status === 1 ? '移回未学习' : '重新学习'}
+            {word.status === 0 ? '加入生词' : word.status === 1 ? '移回未学习' : '重新学习'}
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowBookPick((v) => !v)}>
+            切换词书
           </button>
           {word.status !== 2 && (
             <button className="btn btn-ghost" onClick={() => void markMastered()}>
@@ -193,74 +248,90 @@ export default function WordDetail(): React.JSX.Element {
             </button>
           )}
         </div>
+        {showBookPick && (
+          <div className="book-pick-row">
+            <span className="hint">移动到：</span>
+            {books
+              .filter((b) => b.id !== word.bookId)
+              .map((b) => (
+                <button key={b.id} className="chip" onClick={() => void moveToBook(b.id)}>
+                  {b.name}
+                </button>
+              ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-head-row">
-          <h3 className="card-h3">AI 释义与用法</h3>
-          {profile && (
-            <button className="text-btn" disabled={profileBusy} onClick={() => void generateProfile()}>
-              重新生成
+        <div className="pt-tabs">
+          {DETAIL_TABS.map((t) => (
+            <button
+              key={t.id}
+              className={'pt-tab' + (tab === t.id ? ' active' : '')}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
             </button>
-          )}
+          ))}
         </div>
-        {profile ? (
-          <>
-            <div className="chips" style={{ marginTop: 4 }}>
-              {PROFILE_TABS.map((t) => (
-                <button
-                  key={t.id}
-                  className={'chip' + (profileTab === t.id ? ' chip-active' : '')}
-                  onClick={() => setProfileTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div className="profile-body">
-              {profileTab === 'def' && (
+
+        <div className="pt-body">
+          {tab === 'notes' ? (
+            <>
+              <p className="section-note">写下自己的理解、例句或联想…自动保存。</p>
+              <textarea
+                className="notes-area"
+                value={notes}
+                onChange={(e) => saveNotes(e.target.value)}
+                placeholder="我的笔记…自动保存"
+              />
+            </>
+          ) : !profile ? (
+            <>
+              <p className="section-note">
+                让 AI 生成完整词条：基本释义与用法、例句（可朗读）、搭配、相关词、词形变化，生成后永久保存在本机。
+              </p>
+              <button className="btn" disabled={profileBusy} onClick={() => void generateProfile()}>
+                {profileBusy ? '生成中…' : '生成 AI 释义与用法'}
+              </button>
+              {profileError && (
+                <p className="status-line status-err">
+                  {profileError}
+                  {/配置/.test(profileError) && '（设置 → AI 配置）'}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              {tab === 'def' && (
                 <ol className="profile-defs">
                   {profile.definitions.map((d, i) => (
-                    <li key={i}>{d}</li>
+                    <li key={i}>
+                      <span className="prof-num">{i + 1}</span>
+                      <span>{d}</span>
+                    </li>
                   ))}
                 </ol>
               )}
-              {profileTab === 'ex' && (
+              {tab === 'ex' && (
                 <ul className="profile-examples">
                   {profile.examples.map((ex, i) => (
                     <li key={i}>
-                      <p className="example-en">
-                        {ex.en}
-                        <button className="speak-btn speak-inline" title="朗读例句" onClick={() => speak(ex.en)}>
-                          🔊
-                        </button>
-                      </p>
-                      <p className="example-zh">{ex.zh}</p>
+                      <span className="prof-num">{i + 1}</span>
+                      <div className="example-main">
+                        <p className="example-en">
+                          {highlightWord(ex.en, word.headword)}
+                          <button className="speak-btn speak-inline" title="朗读例句" onClick={() => speak(ex.en)}>
+                            🔊
+                          </button>
+                        </p>
+                        <p className="example-zh">{ex.zh}</p>
+                      </div>
                     </li>
                   ))}
                 </ul>
               )}
-              {profileTab === 'coll' && (
-                <ul className="profile-coll">
-                  {profile.collocations.map((c, i) => (
-                    <li key={i}>
-                      <span className="coll-phrase">{c.phrase}</span>
-                      <span className="coll-zh">{c.zh}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {profileTab === 'rel' && (
-                <ul className="profile-coll">
-                  {profile.related.map((r, i) => (
-                    <li key={i}>
-                      <span className="coll-phrase">{r.word}</span>
-                      <span className="coll-zh">{r.zh}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {profileTab === 'forms' &&
+              {tab === 'forms' &&
                 (profile.forms.length === 0 ? (
                   <p className="stub-note">这个词没有常见词形变化。</p>
                 ) : (
@@ -270,24 +341,34 @@ export default function WordDetail(): React.JSX.Element {
                     ))}
                   </ul>
                 ))}
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="section-note">
-              让 AI 生成完整词条：基本释义与用法、3 个例句（可朗读）、常用搭配、相关词、词形变化。
-            </p>
-            <button className="btn" disabled={profileBusy} onClick={() => void generateProfile()}>
-              {profileBusy ? '生成中…' : '生成 AI 释义与用法'}
-            </button>
-            {profileError && (
-              <p className="status-line status-err">
-                {profileError}
-                {/配置/.test(profileError) && '（设置 → AI 配置）'}
-              </p>
-            )}
-          </>
-        )}
+              {tab === 'coll' && (
+                <ul className="profile-coll">
+                  {profile.collocations.map((c, i) => (
+                    <li key={i}>
+                      <span className="coll-phrase">{c.phrase}</span>
+                      <span className="coll-zh">{c.zh}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {tab === 'rel' && (
+                <div className="rel-chips">
+                  {profile.related.map((r, i) => (
+                    <span key={i} className="rel-chip">
+                      <b>{r.word}</b>
+                      <i>{r.zh}</i>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="pt-foot">
+                <button className="text-btn" disabled={profileBusy} onClick={() => void generateProfile()}>
+                  {profileBusy ? '生成中…' : '重新生成'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -312,16 +393,6 @@ export default function WordDetail(): React.JSX.Element {
           </ul>
         </div>
       )}
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3 className="card-h3">我的笔记</h3>
-        <textarea
-          className="notes-area"
-          value={notes}
-          onChange={(e) => saveNotes(e.target.value)}
-          placeholder="写下自己的理解、例句或联想…自动保存"
-        />
-      </div>
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3 className="card-h3">句子收藏</h3>
@@ -358,7 +429,15 @@ export default function WordDetail(): React.JSX.Element {
               .filter((r) => r.kind !== 'ai_profile')
               .map((r) => (
                 <li key={r.id}>
-                  <span className="record-kind">{r.kind === 'translation' ? '长难句练习' : r.kind === 'ai_grade' ? '造句批改' : r.kind === 'ai_explain' ? 'AI 讲解' : r.kind}</span>
+                  <span className="record-kind">
+                    {r.kind === 'translation'
+                      ? '长难句练习'
+                      : r.kind === 'ai_grade'
+                        ? '造句批改'
+                        : r.kind === 'ai_explain'
+                          ? 'AI 讲解'
+                          : r.kind}
+                  </span>
                   <span className="record-time">{r.occurredAt.slice(0, 10)}</span>
                   <p className="record-payload">
                     {(r.payload as { sentence?: string }).sentence ?? JSON.stringify(r.payload).slice(0, 120)}

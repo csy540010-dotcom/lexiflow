@@ -1,6 +1,6 @@
 import { getDb, kvGet } from './db'
 import { chatCompletion } from './ai'
-import { buildMcqPrompt, buildSentenceTaskPrompt, extractJson } from './prompts'
+import { buildMcqPrompt, buildSentenceTaskPrompt, parseMcq } from './prompts'
 import { getWord } from './library'
 import { resolveBookId } from './study'
 import { getAiConfig } from './settings'
@@ -99,21 +99,22 @@ export async function genMcq(wordId: number, type: PracticeType): Promise<McqQue
   if (cached) return { ...cached, word: word.headword, cached: true }
   const cfg = getAiConfig()
   if (!cfg.baseUrl || !cfg.model) throw new Error('还没有配置 AI：请到「设置 → AI 配置」完成配置。')
-  const raw = await chatCompletion(cfg, [{ role: 'user', content: buildMcqPrompt(word.headword, word.meaning, type) }], {
+  const basePrompt = buildMcqPrompt(word.headword, word.meaning, type)
+  const raw = await chatCompletion(cfg, [{ role: 'user', content: basePrompt }], {
     maxTokens: 700,
     timeoutMs: 60_000
   })
-  const parsed = extractJson(raw) as unknown as McqQuestion | null
-  if (!parsed || !Array.isArray(parsed.options) || parsed.options.length !== 4 || typeof parsed.answer !== 'number') {
-    throw new Error('AI 返回格式异常，请重试一次。')
+  let q = parseMcq(raw)
+  if (!q) {
+    // 弱模型偶发输出杂文：用更严格的提示重试一次，仍失败再报错
+    const raw2 = await chatCompletion(
+      cfg,
+      [{ role: 'user', content: basePrompt + '\n\n上一次输出无法解析。这次请只输出一个 JSON 对象，不要任何解释、围栏或额外文字。' }],
+      { maxTokens: 700, timeoutMs: 60_000 }
+    )
+    q = parseMcq(raw2)
   }
-  const q: McqQuestion = {
-    stem: String(parsed.stem ?? ''),
-    options: parsed.options.map((o) => String(o ?? '')),
-    answer: Math.min(3, Math.max(0, Math.round(Number(parsed.answer)))),
-    explanation: String(parsed.explanation ?? '')
-  }
-  if (!q.stem || q.options.some((o) => !o)) throw new Error('AI 返回格式异常，请重试一次。')
+  if (!q) throw new Error('AI 连续两次返回格式异常，请稍后重试。')
   getDb()
     .prepare("INSERT INTO learning_records (word_id, kind, payload) VALUES (?, 'mcq', ?)")
     .run(wordId, JSON.stringify({ type, ...q }))

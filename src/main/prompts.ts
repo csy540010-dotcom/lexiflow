@@ -1,4 +1,5 @@
 import type { GradeScores } from './mastery'
+import type { McqQuestion } from '../shared/types'
 
 /** AI 讲解提示词：核心含义 + 常用于 + 例句，简洁中文。 */
 export function buildExplainPrompt(word: string, phonetic: string, meaning: string): string {
@@ -110,14 +111,24 @@ export function buildGradePrompt(word: string, sentence: string): string {
   ].join('\n') + '\n\n学习者写的句子：\n' + sentence
 }
 
-/** 从模型回复中提取 JSON（容忍 ```json 围栏与前后杂文）。 */
-export function extractJson(text: string): GradeResult | null {
+/** 通用 JSON 对象提取：容忍 ```json 围栏与前后杂文。 */
+export function extractJsonObject(text: string): unknown | null {
   const cleaned = text.replace(/```(?:json)?/gi, '').trim()
   const start = cleaned.indexOf('{')
   const end = cleaned.lastIndexOf('}')
   if (start === -1 || end <= start) return null
   try {
-    const raw = JSON.parse(cleaned.slice(start, end + 1)) as Partial<GradeResult>
+    return JSON.parse(cleaned.slice(start, end + 1)) as unknown
+  } catch {
+    return null
+  }
+}
+
+/** 从模型回复中提取批改结果 JSON。 */
+export function extractJson(text: string): GradeResult | null {
+  const raw = extractJsonObject(text) as Partial<GradeResult> | null
+  if (!raw) return null
+  try {
     const s = raw.scores ?? ({} as Partial<GradeScores>)
     const clamp5 = (v: unknown): number => Math.min(5, Math.max(1, Math.round(Number(v) || 3)))
     if (!Array.isArray(raw.issues)) return null
@@ -138,5 +149,23 @@ export function extractJson(text: string): GradeResult | null {
     }
   } catch {
     return null
+  }
+}
+
+/** 选择题 JSON 解析（语境选词 / 搭配辨析 / 近义词辨析共用）。 */
+export function parseMcq(text: string): McqQuestion | null {
+  const obj = extractJsonObject(text)
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null
+  const o = obj as Record<string, unknown>
+  const stem = typeof o.stem === 'string' ? o.stem.trim() : ''
+  const options = Array.isArray(o.options) ? o.options.map((x) => String(x ?? '').trim()) : []
+  const answer = Number(o.answer)
+  if (!stem || options.length !== 4 || options.some((x) => !x)) return null
+  if (!Number.isInteger(answer) || answer < 0 || answer > 3) return null
+  return {
+    stem,
+    options,
+    answer,
+    explanation: typeof o.explanation === 'string' ? o.explanation.trim() : ''
   }
 }

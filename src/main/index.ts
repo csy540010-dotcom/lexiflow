@@ -19,6 +19,7 @@ import { PRACTICE_TYPES, practicePool, redoPool, genMcq, genSentenceTask, record
 import type { PracticeType } from '../shared/types'
 import { loadSettings, saveSettingsPatch, saveAiKey, storedKey, testAi } from './settings'
 import { applyGradeToMastery, masteryAverage, type GradeScores } from './mastery'
+import { parseMcq } from './prompts'
 import {
   todaySummary,
   todayQueue,
@@ -193,6 +194,7 @@ app.whenReady().then(() => {
         tape: tapeReview,
         seed: enqueueReview
       },
+      parse: { mcq: parseMcq },
       mastery: { applyGradeToMastery, average: masteryAverage }
     })
   }

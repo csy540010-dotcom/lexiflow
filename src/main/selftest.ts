@@ -73,6 +73,9 @@ export interface SelfTestHooks {
   import: ImportHooks
   study: StudyHooks
   review: ReviewHooks
+  parse: {
+    mcq: (text: string) => { stem: string; options: string[]; answer: number; explanation: string } | null
+  }
   mastery: MasteryHooks
 }
 
@@ -265,6 +268,18 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(hooks.review.queue().items.every((i) => i.wordId !== q[1]), '胶带 = 明天再来（今日到期消失）')
     hooks.review.graduate(q[1])
     assert(hooks.review.queue().items.every((i) => i.wordId !== q[0] && i.wordId !== q[1]), '种子已清理')
+
+    // 9.9 选择题解析回归（修复：批改解析器要求 issues 字段，导致选择类练习全部「格式异常」）
+    const mcq1 = hooks.parse.mcq(
+      '{"stem":"The ____ changed suddenly.","options":["weather","whether","wether","weater"],"answer":0,"explanation":"weather 是天气。"}'
+    )
+    assert(!!mcq1 && mcq1.answer === 0 && mcq1.options.length === 4, 'MCQ 解析：纯 JSON（answer=0）')
+    const mcq2 = hooks.parse.mcq(
+      '好的，下面是题目：\n```json\n{"stem":"a ____ b","options":["x","y","z","w"],"answer":2,"explanation":"选 z"}\n```\n希望有帮助'
+    )
+    assert(!!mcq2 && mcq2.answer === 2, 'MCQ 解析：围栏+前后杂文（answer=2）')
+    assert(hooks.parse.mcq('这不是 JSON') === null, 'MCQ 解析：坏输入返回 null')
+    assert(hooks.parse.mcq('{"stem":"x","options":["a","b","c"],"answer":0}') === null, 'MCQ 解析：选项不足 4 个拒绝')
 
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })

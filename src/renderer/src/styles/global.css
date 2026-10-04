@@ -867,6 +867,26 @@ body {
   color: var(--lf-muted);
 }
 
+.book-plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--lf-line);
+  flex-wrap: wrap;
+}
+
+.book-plan-text {
+  font-size: 13px;
+  color: var(--lf-muted);
+}
+
+.book-plan-text strong {
+  color: var(--lf-accent);
+}
+
 /* ── 单词学习会话 ─────────────────────────── */
 .session-progress {
   font-size: 13px;

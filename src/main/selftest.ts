@@ -462,6 +462,8 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     // 11. 截图：今日学习 + 单词学习会话 + 复习 + 练习中心
     await win.webContents.executeJavaScript("location.hash = '#/today'")
     await new Promise((r) => setTimeout(r, 1000))
+    const todayText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/学习计划|调整计划/.test(todayText), '今日页含学习计划入口（DOM 文本断言）')
     fs.writeFileSync(path.join(selftestDir, 'm3-today.png'), (await win.webContents.capturePage()).toPNG())
     await win.webContents.executeJavaScript("location.hash = '#/today/study'")
     await new Promise((r) => setTimeout(r, 1000))

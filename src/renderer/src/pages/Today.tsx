@@ -105,6 +105,17 @@ export default function Today(): React.JSX.Element {
               style={{ width: summary.totalWords ? Math.round((summary.learnedWords / summary.totalWords) * 100) + '%' : '0%' }}
             />
           </div>
+          {plan && (
+            <div className="book-plan-row">
+              <span className="book-plan-text">
+                学习计划：新词 <strong>{plan.dailyNew}</strong> · 复习上限 <strong>{plan.dailyReviewLimit}</strong> ·{' '}
+                {plan.dailyMinutes} 分钟 · 强度 <strong>{plan.reviewIntensity}/5</strong>
+              </span>
+              <button className="btn btn-sm" onClick={() => setShowPlan(true)}>
+                ⚙ 调整计划
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -224,17 +235,6 @@ export default function Today(): React.JSX.Element {
           <p className="section-note" style={{ marginTop: 10 }}>
             今日已批改 {summary.gradedToday} 个词
           </p>
-        )}
-        {plan && (
-          <div className="plan-line">
-            <span>
-              每日计划：新词 {plan.dailyNew} · 复习上限 {plan.dailyReviewLimit} · {plan.dailyMinutes} 分钟 · 强度{' '}
-              {plan.reviewIntensity}/5
-            </span>
-            <button className="text-btn" onClick={() => setShowPlan(true)}>
-              调整计划 ⚙
-            </button>
-          </div>
         )}
       </div>
 

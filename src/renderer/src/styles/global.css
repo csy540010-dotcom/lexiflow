@@ -275,3 +275,391 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   z-index: 50;
 }
+
+/* ── 词汇库 ─────────────────────────── */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.btn-sm {
+  padding: 7px 13px;
+  font-size: 12px;
+}
+
+.vocab-card {
+  margin-top: 18px;
+}
+
+.vocab-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.vocab-toolbar select {
+  max-width: 320px;
+  padding: 9px 12px;
+  border: 1px solid var(--lf-line);
+  border-radius: 10px;
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.vocab-bookmeta {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--lf-muted);
+}
+
+.vocab-search input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--lf-line);
+  border-radius: 10px;
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.vocab-search input:focus {
+  border-color: var(--lf-accent);
+  box-shadow: 0 0 0 3px rgba(66, 119, 101, 0.12);
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid var(--lf-line);
+  background: transparent;
+  color: var(--lf-muted);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--lf-accent);
+}
+
+.chip-active {
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+  color: #fff;
+}
+
+.word-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.word-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 6px;
+  border-bottom: 1px solid var(--lf-line);
+  cursor: pointer;
+}
+
+.word-row:last-child {
+  border-bottom: 0;
+}
+
+.word-row:hover {
+  background: rgba(66, 119, 101, 0.05);
+}
+
+.word-row-main {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.word-row-head {
+  font-size: 15px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.word-row-meaning {
+  font-size: 13px;
+  color: var(--lf-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.word-row-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lf-line);
+}
+
+.dot-on {
+  background: var(--lf-accent);
+}
+
+.star {
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  color: #c9b98a;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.starred {
+  color: #d9a514;
+}
+
+.star-lg {
+  font-size: 22px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.pager-info {
+  font-size: 12px;
+  color: var(--lf-muted);
+}
+
+/* ── 弹窗 ─────────────────────────── */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 28, 24, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.modal {
+  background: var(--lf-card);
+  border: 1px solid var(--lf-line);
+  border-radius: 16px;
+  padding: 22px 24px;
+  width: min(420px, 90vw);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+}
+
+.modal-wide {
+  width: min(520px, 92vw);
+}
+
+.import-book-list {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 2;
+}
+
+/* ── 单词详情 ─────────────────────────── */
+.detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 760px;
+  margin-bottom: 14px;
+}
+
+.back-link {
+  color: var(--lf-accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.detail-pager {
+  display: flex;
+  gap: 14px;
+}
+
+.text-btn {
+  background: transparent;
+  border: 0;
+  color: var(--lf-accent);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.text-btn:disabled {
+  color: var(--lf-line);
+  cursor: default;
+}
+
+.detail-head {
+  border-bottom-width: 2px;
+}
+
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.detail-word {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.detail-phonetic {
+  margin: 8px 0 10px;
+  font-size: 14px;
+  color: var(--lf-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-status {
+  background: rgba(66, 119, 101, 0.1);
+  color: var(--lf-accent);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.detail-due {
+  color: #b07b2c;
+  font-size: 12px;
+}
+
+.detail-meaning {
+  margin: 0 0 16px;
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.mastery-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mastery-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mastery-label {
+  width: 44px;
+  font-size: 13px;
+  color: var(--lf-muted);
+}
+
+.prompt-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 2.1;
+  color: var(--lf-ink);
+}
+
+.notes-area {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px 14px;
+  border: 1px solid var(--lf-line);
+  border-radius: 12px;
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  font-size: 14px;
+  line-height: 1.8;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.notes-area:focus {
+  border-color: var(--lf-accent);
+  box-shadow: 0 0 0 3px rgba(66, 119, 101, 0.12);
+}
+
+.record-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.record-list li {
+  border: 1px solid var(--lf-line);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.record-kind {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lf-accent);
+  margin-right: 10px;
+}
+
+.record-time {
+  font-size: 12px;
+  color: var(--lf-muted);
+}
+
+.record-payload {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--lf-ink);
+  line-height: 1.8;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+

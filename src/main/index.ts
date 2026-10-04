@@ -1,8 +1,21 @@
-import { app, shell, BrowserWindow, ipcMain, safeStorage } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, safeStorage, dialog } from 'electron'
 import path from 'node:path'
 import { getDb, dbFilePath, kvGet, kvSet } from './db'
 import { normalizeAi, aiConfigProblem, chatCompletion, presetDefaults } from './ai'
-import type { AppSettings, SettingsPatch, AiTestResult } from '../shared/types'
+import { ensureDictionaryImported, ensureBuiltinBooks } from './dictionary'
+import {
+  listBooks,
+  createBook,
+  renameBook,
+  deleteBook,
+  queryWords,
+  getWord,
+  updateWord,
+  addWord,
+  type WordQueryArgs
+} from './library'
+import { detectObsidianData, importObsidianData, removeImportedBooks } from './import-obsidian'
+import type { AppSettings, SettingsPatch, AiTestResult, WordUpdatePatch } from '../shared/types'
 import { runSelfTest } from './selftest'
 
 const KEY_ENC_KEY = 'ai_key_enc'
@@ -176,6 +189,17 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  // 数据底座：词典入库（一次性）+ 内置四六级书（首次运行建好 4544+3991 词）
+  try {
+    const dict = ensureDictionaryImported()
+    const books = ensureBuiltinBooks()
+    console.log(
+      `[lexiflow] dictionary ${dict.imported ? `imported ${dict.words} entries` : 'ready'}, builtin books ${books.created ? `seeded ${books.words} words` : 'ready'}`
+    )
+  } catch (err) {
+    console.error('[lexiflow] 词典/内置书初始化失败:', err)
+  }
+
   ipcMain.handle('db:ping', () => ({
     sqliteVersion: (getDb().prepare('SELECT sqlite_version() AS v').get() as { v: string }).v,
     dbPath: dbFilePath()
@@ -190,6 +214,25 @@ app.whenReady().then(() => {
     testAi(cfg)
   )
 
+  ipcMain.handle('library:books:list', () => listBooks())
+  ipcMain.handle('library:books:create', (_e, name: string) => createBook(String(name ?? '')))
+  ipcMain.handle('library:books:rename', (_e, id: number, name: string) => renameBook(Number(id), String(name ?? '')))
+  ipcMain.handle('library:books:delete', (_e, id: number) => deleteBook(Number(id)))
+  ipcMain.handle('library:words:query', (_e, args: WordQueryArgs) => queryWords(args))
+  ipcMain.handle('library:words:get', (_e, id: number) => getWord(Number(id)))
+  ipcMain.handle('library:words:update', (_e, id: number, patch: WordUpdatePatch) => updateWord(Number(id), patch))
+  ipcMain.handle('library:words:add', (_e, bookId: number, headword: string) => addWord(Number(bookId), String(headword ?? '')))
+
+  ipcMain.handle('import:obsidian:detect', (_e, dir: string) => detectObsidianData(String(dir ?? '')))
+  ipcMain.handle('import:obsidian:run', (_e, dir: string) => importObsidianData(String(dir ?? '')))
+  ipcMain.handle('dialog:pickDir', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择 Obsidian 插件的 data 目录',
+      properties: ['openDirectory']
+    })
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
+  })
+
   const win = createWindow()
   console.log('[lexiflow] window created, db ready')
 
@@ -198,7 +241,26 @@ app.whenReady().then(() => {
   })
 
   if (process.env['LEXI_SELFTEST'] === '1') {
-    void runSelfTest(win, { loadSettings, saveSettingsPatch, testAi, saveAiKey, storedKey })
+    void runSelfTest(win, {
+      loadSettings,
+      saveSettingsPatch,
+      testAi,
+      saveAiKey,
+      storedKey,
+      library: {
+        listBooks,
+        queryWords,
+        getWord,
+        updateWord,
+        createBook,
+        deleteBook
+      },
+      import: {
+        detect: detectObsidianData,
+        run: importObsidianData,
+        cleanup: removeImportedBooks
+      }
+    })
   }
 })
 

@@ -36,6 +36,12 @@
       "out/**",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**"
     ],

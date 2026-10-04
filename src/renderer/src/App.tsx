@@ -6,6 +6,7 @@ import Training from './pages/Training'
 import Reading from './pages/Reading'
 import Music from './pages/Music'
 import Vocabulary from './pages/Vocabulary'
+import WordDetail from './pages/WordDetail'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
 import { applyTheme } from './lib/theme'
@@ -29,6 +30,7 @@ export default function App(): React.JSX.Element {
           <Route path="/reading" element={<Reading />} />
           <Route path="/music" element={<Music />} />
           <Route path="/vocabulary" element={<Vocabulary />} />
+          <Route path="/vocabulary/word/:id" element={<WordDetail />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

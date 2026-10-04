@@ -203,6 +203,22 @@ export interface PracticePoolItem {
   sentence?: string
 }
 
+/* ── 统计分析（M5） ─────────────── */
+
+export interface StatsSummary {
+  studyMinutes: number
+  newMastered: number
+  gradedCount: number
+  gradeAvg: number
+  mcqTotal: number
+  mcqCorrect: number
+  reviewGraduated: number
+  reviewTaped: number
+  topMistakes: Array<{ word: string; count: number }>
+  tasksDone: Array<{ kind: string; count: number }>
+  mastery: { unlearned: number; learning: number; mastered: number }
+}
+
 export interface ExplainResult {
   content: string
   cached: boolean

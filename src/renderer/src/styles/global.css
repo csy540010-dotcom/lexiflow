@@ -1218,3 +1218,89 @@ body {
   line-height: 1.8;
 }
 
+/* ── 统计分析 ─────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  max-width: 980px;
+}
+
+.stat-card {
+  max-width: none;
+  padding: 18px 20px;
+}
+
+.stat-big {
+  margin: 4px 0 8px;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--lf-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lf-muted);
+}
+
+.stat-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.stat-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mistake-word {
+  font-weight: 600;
+}
+
+.mistake-count {
+  color: var(--lf-danger);
+  font-size: 12px;
+}
+
+.dist-row {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--lf-muted);
+  margin-bottom: 8px;
+}
+
+.dist-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--lf-line);
+}
+
+.dist-seg {
+  height: 100%;
+}
+
+.dist-seg-muted {
+  background: var(--lf-line);
+}
+
+.dist-seg-learning {
+  background: #c9a35a;
+}
+
+.dist-seg-mastered {
+  background: var(--lf-accent);
+}
+

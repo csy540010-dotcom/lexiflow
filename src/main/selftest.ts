@@ -76,6 +76,24 @@ export interface SelfTestHooks {
   parse: {
     mcq: (text: string) => { stem: string; options: string[]; answer: number; explanation: string } | null
   }
+  stats: {
+    summary: (days: number | null) => {
+      studyMinutes: number
+      newMastered: number
+      gradedCount: number
+      gradeAvg: number
+      mcqTotal: number
+      mcqCorrect: number
+      reviewGraduated: number
+      reviewTaped: number
+      topMistakes: Array<{ word: string; count: number }>
+      tasksDone: Array<{ kind: string; count: number }>
+      mastery: { unlearned: number; learning: number; mastered: number }
+    }
+    seed: () => { wordId: number }
+    cleanup: () => void
+    cleanupReviewEvents: (wordIds: number[]) => void
+  }
   mastery: MasteryHooks
 }
 
@@ -268,6 +286,7 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(hooks.review.queue().items.every((i) => i.wordId !== q[1]), '胶带 = 明天再来（今日到期消失）')
     hooks.review.graduate(q[1])
     assert(hooks.review.queue().items.every((i) => i.wordId !== q[0] && i.wordId !== q[1]), '种子已清理')
+    hooks.stats.cleanupReviewEvents([q[0], q[1]])
 
     // 9.9 选择题解析回归（修复：批改解析器要求 issues 字段，导致选择类练习全部「格式异常」）
     const mcq1 = hooks.parse.mcq(
@@ -280,6 +299,34 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(!!mcq2 && mcq2.answer === 2, 'MCQ 解析：围栏+前后杂文（answer=2）')
     assert(hooks.parse.mcq('这不是 JSON') === null, 'MCQ 解析：坏输入返回 null')
     assert(hooks.parse.mcq('{"stem":"x","options":["a","b","c"],"answer":0}') === null, 'MCQ 解析：选项不足 4 个拒绝')
+
+    // 9.95 统计分析：幂等预清理 → seed → 断言聚合 → 清理
+    hooks.stats.cleanup() // 上次失败运行可能留下 seed 残留，先清掉保证基线干净
+    const baseline = hooks.stats.summary(7)
+    hooks.stats.seed()
+    const st = hooks.stats.summary(7)
+    assert(
+      st.studyMinutes >= baseline.studyMinutes + 2,
+      `统计：学习时长 +2 分钟（${baseline.studyMinutes} → ${st.studyMinutes}）`
+    )
+    // 真实库里已有其他批改记录，分数未知：断言「新增 4.0 分记录后，均值落在 [基线,4.0] 区间内」
+    const lo = Math.min(baseline.gradeAvg, 4) - 0.1
+    const hi = Math.max(baseline.gradeAvg, 4) + 0.1
+    assert(
+      st.gradedCount === baseline.gradedCount + 1 && st.gradeAvg >= lo && st.gradeAvg <= hi,
+      `统计：批改次数 +1、均值含新记录（${baseline.gradeAvg} → ${st.gradeAvg}）`
+    )
+    assert(st.mcqTotal === baseline.mcqTotal + 5 && st.mcqCorrect === baseline.mcqCorrect + 4,
+      '统计：选择题准确率（+4/5，造句类不计入）')
+    assert(st.reviewGraduated === baseline.reviewGraduated + 1, '统计：复习毕业 +1')
+    assert(st.topMistakes.some((m) => m.count >= 2), '统计：高频错误词含 2 个错误点')
+    hooks.stats.cleanup()
+    const cleaned = hooks.stats.summary(7)
+    assert(
+      cleaned.gradedCount === baseline.gradedCount && cleaned.mcqTotal === baseline.mcqTotal &&
+        cleaned.reviewGraduated === baseline.reviewGraduated && cleaned.studyMinutes === baseline.studyMinutes,
+      '统计：seed 数据已清理'
+    )
 
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })
@@ -320,6 +367,13 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     const practiceText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
     assert(/单词练习|中译英|语境选词|自由表达/.test(practiceText), '练习中心渲染出内容（DOM 文本断言）')
     fs.writeFileSync(path.join(selftestDir, 'm4-practice.png'), (await win.webContents.capturePage()).toPNG())
+
+    // 12. 截图：统计分析
+    await win.webContents.executeJavaScript("location.hash = '#/stats'")
+    await new Promise((r) => setTimeout(r, 900))
+    const statsText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/统计分析|学习时长|练习准确率|高频错误词/.test(statsText), '统计页渲染出内容（DOM 文本断言）')
+    fs.writeFileSync(path.join(selftestDir, 'm5-stats.png'), (await win.webContents.capturePage()).toPNG())
     console.log('[lexiflow] selftest screenshots saved')
 
     console.log('[lexiflow] selftest OK')

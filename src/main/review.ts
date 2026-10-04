@@ -83,9 +83,22 @@ export function reviewQueue(bookId?: number): ReviewQueueResult {
   return { items, counts, total: items.length }
 }
 
+/** 复习事件留痕（统计分析用）。 */
+function logReviewEvent(kind: 'review_graduate' | 'review_tape', wordId: number): void {
+  const d = new Date()
+  const date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+  const headword = (
+    getDb().prepare('SELECT headword FROM words WHERE id = ?').get(Number(wordId)) as { headword: string } | undefined
+  )?.headword
+  getDb()
+    .prepare("INSERT INTO study_events (kind, payload) VALUES (?, ?)")
+    .run(kind, JSON.stringify({ date, wordId: Number(wordId), headword: headword ?? '' }))
+}
+
 /** 毕业出队：毕业词不自动回队，只能靠学习时再点「不熟」回来。 */
 export function graduateReview(wordId: number): void {
   getDb().prepare('DELETE FROM review_queue WHERE word_id = ?').run(Number(wordId))
+  logReviewEvent('review_graduate', wordId)
 }
 
 /** 还不会：明天再来。 */
@@ -99,6 +112,7 @@ export function tapeReview(wordId: number): void {
        ON CONFLICT(word_id) DO UPDATE SET due_date = excluded.due_date, reason = 'tape'`
     )
     .run(Number(wordId), due)
+  logReviewEvent('review_tape', wordId)
 }
 
 /** 学习时点胶带 = 不熟 → 入队（复习语义之外，供学习会话复用）。 */

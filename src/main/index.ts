@@ -20,6 +20,7 @@ import type { PracticeType } from '../shared/types'
 import { loadSettings, saveSettingsPatch, saveAiKey, storedKey, testAi } from './settings'
 import { applyGradeToMastery, masteryAverage, type GradeScores } from './mastery'
 import { parseMcq } from './prompts'
+import { statsSummary, localDate, seedStats, cleanupStats, cleanupReviewEvents } from './stats'
 import {
   todaySummary,
   todayQueue,
@@ -153,6 +154,14 @@ app.whenReady().then(() => {
     recordPractice(type, payload ?? {})
   )
 
+  ipcMain.handle('stats:summary', (_e, days: number | null) => statsSummary(days ? Number(days) : null))
+  ipcMain.handle('stats:tick', (_e, seconds: number) => {
+    const s = Math.max(1, Math.min(600, Number(seconds) || 30))
+    getDb()
+      .prepare('INSERT INTO study_time (date, seconds) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET seconds = seconds + excluded.seconds')
+      .run(localDate(), s)
+  })
+
   const win = createWindow()
   console.log('[lexiflow] window created, db ready')
 
@@ -195,6 +204,12 @@ app.whenReady().then(() => {
         seed: enqueueReview
       },
       parse: { mcq: parseMcq },
+      stats: {
+        summary: statsSummary,
+        seed: seedStats,
+        cleanup: cleanupStats,
+        cleanupReviewEvents
+      },
       mastery: { applyGradeToMastery, average: masteryAverage }
     })
   }

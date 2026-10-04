@@ -19,7 +19,8 @@ import type {
   ReviewQueueResult,
   PracticeType,
   McqResponse,
-  PracticePoolItem
+  PracticePoolItem,
+  StatsSummary
 } from '../shared/types'
 
 const api = {
@@ -77,7 +78,10 @@ const api = {
   genSentenceTask: (wordId: number, type: PracticeType): Promise<{ instruction: string; cached: boolean }> =>
     ipcRenderer.invoke('practice:task', wordId, type),
   recordPractice: (type: PracticeType, payload: Record<string, unknown>): Promise<void> =>
-    ipcRenderer.invoke('practice:record', type, payload)
+    ipcRenderer.invoke('practice:record', type, payload),
+
+  statsSummary: (days: number | null): Promise<StatsSummary> => ipcRenderer.invoke('stats:summary', days),
+  statsTick: (seconds: number): Promise<void> => ipcRenderer.invoke('stats:tick', seconds)
 }
 
 export type LexiApi = typeof api

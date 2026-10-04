@@ -162,7 +162,17 @@ export async function gradeSentence(wordId: number, sentence: string): Promise<{
   const mastery = applyGradeToMastery(word.mastery, grade.scores)
   const avg = masteryAverage(mastery)
   const status = avg >= 4.5 ? 2 : word.status === 0 ? 1 : word.status
-  db.prepare('UPDATE words SET mastery = ?, status = ? WHERE id = ?').run(JSON.stringify(mastery), status, wordId)
+  if (status === 2 && word.status !== 2) {
+    // 首次达到「已掌握」：记下时间戳，供统计分析「新掌握词」
+    db.prepare('UPDATE words SET mastery = ?, status = ?, mastered_at = ? WHERE id = ?').run(
+      JSON.stringify(mastery),
+      status,
+      todayKey(),
+      wordId
+    )
+  } else {
+    db.prepare('UPDATE words SET mastery = ?, status = ? WHERE id = ?').run(JSON.stringify(mastery), status, wordId)
+  }
   return { grade, word: getWord(wordId) }
 }
 

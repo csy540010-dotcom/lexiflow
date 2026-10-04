@@ -22,6 +22,16 @@ export default function App(): React.JSX.Element {
       .catch(() => {})
   }, [])
 
+  // 学习时长心跳：窗口可见时每 30 秒累计一次
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void window.lexi.statsTick(30)
+      }
+    }, 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   return (
     <div className="app-shell">
       <Sidebar />

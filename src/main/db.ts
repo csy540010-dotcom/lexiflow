@@ -41,6 +41,7 @@ function migrate(db: Database.Database): void {
       notes TEXT NOT NULL DEFAULT '',
       mastery TEXT NOT NULL DEFAULT '{}',
       added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      mastered_at TEXT NOT NULL DEFAULT '',
       UNIQUE(book_id, headword)
     );
     CREATE INDEX IF NOT EXISTS idx_words_book ON words(book_id);
@@ -98,7 +99,18 @@ function migrate(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_fav_word ON sentence_favorites(word_id);
+
+    CREATE TABLE IF NOT EXISTS study_time (
+      date TEXT PRIMARY KEY,
+      seconds INTEGER NOT NULL DEFAULT 0
+    );
   `)
+  // 旧库补列：mastered_at（M5 新掌握词统计用；新库在 CREATE TABLE 里自带）
+  try {
+    db.exec("ALTER TABLE words ADD COLUMN mastered_at TEXT NOT NULL DEFAULT ''")
+  } catch {
+    /* 已存在 */
+  }
 }
 
 export function dbFilePath(): string {

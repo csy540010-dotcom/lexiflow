@@ -4,10 +4,21 @@
   --lf-sidebar-bg: #1f3d2f;
   --lf-paper: #f6f3ea;
   --lf-card: #fdfbf4;
+  --lf-field: #ffffff;
   --lf-ink: #26302b;
   --lf-muted: #7a8580;
   --lf-line: #e3ddcd;
+  --lf-danger: #b0483c;
   --lf-radius: 18px;
+}
+
+[data-theme='dark'] {
+  --lf-paper: #171e1a;
+  --lf-card: #1f2823;
+  --lf-field: #242e28;
+  --lf-ink: #e4ebe6;
+  --lf-muted: #93a39a;
+  --lf-line: #31423a;
 }
 
 * {
@@ -133,12 +144,134 @@ body {
   line-height: 1.9;
 }
 
+.section-note {
+  margin: 0 0 16px;
+  color: var(--lf-muted);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
 .status-ok {
   color: var(--lf-accent);
   font-weight: 600;
 }
 
+.status-err {
+  color: var(--lf-danger);
+}
+
 .db-path {
   font-size: 12px;
   word-break: break-all;
+}
+
+/* ── 表单 ─────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field .hint {
+  font-size: 12px;
+  color: var(--lf-muted);
+}
+
+.field input[type='text'],
+.field input[type='password'],
+.field input[type='number'],
+.field select {
+  padding: 10px 12px;
+  border: 1px solid var(--lf-line);
+  border-radius: 10px;
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  max-width: 420px;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--lf-accent);
+  box-shadow: 0 0 0 3px rgba(66, 119, 101, 0.12);
+}
+
+.intensity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.intensity-row input[type='range'] {
+  flex: 1;
+  accent-color: var(--lf-accent);
+}
+
+/* ── 按钮 ─────────────────────────── */
+.btn {
+  background: var(--lf-accent);
+  color: #fff;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 17px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--lf-accent-dark);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--lf-accent);
+  border: 1px solid var(--lf-line);
+}
+
+.btn-ghost:hover {
+  background: rgba(66, 119, 101, 0.08);
+}
+
+.btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.status-line {
+  font-size: 13px;
+  margin: 12px 0 0;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+/* ── 提示 ─────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2b3a32;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 50;
 }

@@ -116,6 +116,7 @@ export interface SelfTestHooks {
     setText: (id: number, text: string) => { id: number; textContent: string }
     setNotes: (id: number, notes: string) => { id: number; notes: string }
     words: (id: number) => Array<{ word: string; meaning: string; inBook: boolean }>
+    clean: (text: string) => string
     remove: (id: number) => Array<{ id: number }>
     tick: (seconds: number) => void
     untick: (seconds: number) => void
@@ -469,6 +470,11 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     )
     hooks.music.setNotes(track.id, '自检笔记：注意连读。')
     assert(hooks.music.list().find((t) => t.id === track.id)?.notes === '自检笔记：注意连读。', '听力：笔记自动保存')
+    const cleanedSub = hooks.music.clean('[ti:0]\n[00:01.74]Hello world.\n[00:04.74]How are you?\n\n[00:09.46]Fine.')
+    assert(
+      !cleanedSub.includes('[') && cleanedSub.includes('Hello world.') && cleanedSub.split('\n').length === 3,
+      `听力：字幕本地清理（去时间戳/元数据，剩 ${cleanedSub.split('\n').length} 行）`
+    )
     hooks.music.tick(60)
     const withListen = hooks.stats.summary(7)
     assert(withListen.listeningMinutes === baselineM6.listeningMinutes + 1, `听力：听力时间 +1 分钟（${baselineM6.listeningMinutes} → ${withListen.listeningMinutes}）`)

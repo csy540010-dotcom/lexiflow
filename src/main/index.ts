@@ -45,6 +45,7 @@ import {
   organizeTrack,
   listeningTick,
   unlisteningTick,
+  cleanSubtitleText,
   musicDir
 } from './music'
 
@@ -347,6 +348,7 @@ app.whenReady().then(() => {
         setText: setTrackText,
         setNotes: setTrackNotes,
         words: extractWordsFromTrack,
+        clean: cleanSubtitleText,
         remove: deleteTrack,
         tick: listeningTick,
         untick: unlisteningTick

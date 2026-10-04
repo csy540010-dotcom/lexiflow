@@ -137,7 +137,44 @@ export function deleteTrack(id: number): TrackItem[] {
   return listTracks()
 }
 
-/** AI 整理原文：清理格式、分段分句（时间轴对齐留后续版本）。 */
+/** 本地清理字幕文本：去掉行首时间戳（[mm:ss.xx]）与 [ti:] 等元数据行，去空行。 */
+export function cleanSubtitleText(raw: string): string {
+  return raw
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .map((line) => line.replace(/^\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]\s*/, '').trim())
+    .map((line) => line.replace(/^\[[a-z]{2}\s*:.*?\]\s*$/i, '').trim())
+    .filter((line) => line.length > 0)
+    .join('\n')
+}
+
+/** 按行分块（每块约 maxChars 字符），避免长文本被模型截断。 */
+function chunkLines(text: string, maxChars: number): string[] {
+  const lines = text.split('\n')
+  const chunks: string[] = []
+  let cur = ''
+  for (const line of lines) {
+    if (cur && (cur.length + 1 + line.length) > maxChars) {
+      chunks.push(cur)
+      cur = line
+    } else {
+      cur = cur ? cur + '\n' + line : line
+    }
+  }
+  if (cur) chunks.push(cur)
+  return chunks
+}
+
+/** 无 AI 兜底：把若干碎行并成小段。 */
+function fallbackSegment(chunk: string): string[] {
+  const lines = chunk.split('\n').filter(Boolean)
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i += 3) out.push(lines.slice(i, i + 3).join(' '))
+  return out
+}
+
+/** AI 整理原文：本地清噪 → 分块语义分段 → 合并；单块失败用本地粗分兜底（不中断整体）。 */
 export async function organizeTrack(id: number): Promise<TrackItem> {
   const db = getDb()
   const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
@@ -147,23 +184,35 @@ export async function organizeTrack(id: number): Promise<TrackItem> {
   if (!row.text_content.trim()) throw new Error('先导入或粘贴对应文本，再让 AI 整理。')
   const cfg = getAiConfig()
   if (!cfg.baseUrl || !cfg.model) throw new Error('还没有配置 AI：请到「设置 → AI 配置」完成配置。')
-  const raw = await chatCompletion(cfg, [{ role: 'user', content: buildOrganizeTextPrompt(row.title, row.text_content) }], {
-    maxTokens: 2000,
-    timeoutMs: 90_000
-  })
-  const parsed = extractJsonObject(raw)
-  let segments: string[] = []
-  if (Array.isArray(parsed)) segments = parsed.map((s) => String(s ?? '').trim()).filter((s) => s.length > 0)
-  if (segments.length === 0) {
-    // 容错：按空行/换行粗分
-    segments = row.text_content
-      .split(/\n{2,}/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
+
+  const cleaned = cleanSubtitleText(row.text_content)
+  if (!cleaned) throw new Error('文本清理后为空，请检查文本内容。')
+  const chunks = chunkLines(cleaned, 5000).slice(0, 12)
+  const allSegments: string[] = []
+  let aiFailedChunks = 0
+  for (const chunk of chunks) {
+    try {
+      const raw = await chatCompletion(cfg, [{ role: 'user', content: buildOrganizeTextPrompt(row.title, chunk) }], {
+        maxTokens: 3000,
+        timeoutMs: 90_000
+      })
+      const parsed = extractJsonObject(raw)
+      const segs = Array.isArray(parsed)
+        ? parsed.map((s) => String(s ?? '').trim()).filter((s) => s.length > 0)
+        : []
+      if (segs.length === 0) throw new Error('empty')
+      allSegments.push(...segs)
+    } catch {
+      aiFailedChunks++
+      allSegments.push(...fallbackSegment(chunk))
+    }
   }
-  if (segments.length === 0) throw new Error('AI 返回格式异常，请重试一次。')
-  db.prepare('UPDATE tracks SET segments = ? WHERE id = ?').run(JSON.stringify(segments), Number(id))
+  if (allSegments.length === 0) throw new Error('整理失败，请检查文本后重试。')
+  db.prepare('UPDATE tracks SET segments = ? WHERE id = ?').run(JSON.stringify(allSegments), Number(id))
   const updated = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as unknown as TrackRow
+  if (aiFailedChunks > 0) {
+    console.log(`[lexiflow] organizeTrack: ${aiFailedChunks}/${chunks.length} 块走本地兜底`)
+  }
   return mapTrack(updated)
 }
 

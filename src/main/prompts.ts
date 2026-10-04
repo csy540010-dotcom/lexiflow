@@ -87,15 +87,18 @@ export function buildSentenceTaskPrompt(word: string, meaning: string, type: 'tr
   ].join('\n')
 }
 
-/** 听力原文整理（音乐听力）：清理、分段、分句。 */
-export function buildOrganizeTextPrompt(title: string, text: string): string {
+/** 听力原文整理（音乐听力）：清理、分段、分句。调用方负责分块传入。 */
+export function buildOrganizeTextPrompt(title: string, chunk: string): string {
   return [
-    '把下面的英语听力材料原文整理成适合跟读和对照的分段文本。',
-    '要求：去掉时间戳、页码、字幕编号、广告等杂质；按语义分段；保留原英文，不要翻译、不要改写、不要增删内容。',
-    '只输出一个 JSON 数组，每个元素是一段整理后的文本：["段1","段2",...]',
+    '下面是一段英语听力材料的原文（可能来自字幕文件：逐行很碎、句子被拆断、带时间戳残留）。',
+    '请把它整理成适合跟读和对照的分段文本：',
+    '1) 合并被拆断的句子，按语义分成自然段，每段 1-3 句；',
+    '2) 去掉行首残留的时间戳、编号、页眉页脚等噪声；',
+    '3) 保留原英文，不要翻译、不要改写、不要增删内容；',
+    '只输出一个 JSON 数组，每个元素是一段整理后的文本：["段1","段2",...]。不要输出其他任何文字。',
     title ? '材料标题：' + title : '',
     '原文：',
-    text.slice(0, 8000)
+    chunk
   ]
     .filter(Boolean)
     .join('\n')

@@ -274,25 +274,27 @@ export default function Music(): React.JSX.Element {
             </div>
 
             <div className="card module-card" style={{ marginTop: 16 }}>
-              <div className="card-head-row">
-                <div className="chips" style={{ margin: 0 }}>
-                  <button className={'chip' + (tab === 'raw' ? ' chip-active' : '')} onClick={() => setTab('raw')}>
+              <div className="music-tabs-row">
+                <div className="pt-tabs pt-tabs-inline">
+                  <button className={'pt-tab' + (tab === 'raw' ? ' active' : '')} onClick={() => setTab('raw')}>
                     原文
                   </button>
-                  <button className={'chip' + (tab === 'organized' ? ' chip-active' : '')} onClick={() => setTab('organized')}>
+                  <button className={'pt-tab' + (tab === 'organized' ? ' active' : '')} onClick={() => setTab('organized')}>
                     AI 整理{selected.segments.length > 0 ? `（${selected.segments.length}）` : ''}
                   </button>
-                  <button className={'chip' + (tab === 'words' ? ' chip-active' : '')} onClick={() => void openWordsTab()}>
+                  <button className={'pt-tab' + (tab === 'words' ? ' active' : '')} onClick={() => void openWordsTab()}>
                     生词
                   </button>
-                  <button className={'chip' + (tab === 'notes' ? ' chip-active' : '')} onClick={() => setTab('notes')}>
+                  <button className={'pt-tab' + (tab === 'notes' ? ' active' : '')} onClick={() => setTab('notes')}>
                     笔记
                   </button>
                 </div>
                 {tab === 'raw' && (
-                  <button className="btn btn-sm" disabled={busy || !textDraft.trim()} onClick={() => void organize()}>
-                    {busy ? '整理中…' : 'AI 整理文本'}
-                  </button>
+                  <div className="music-tabs-action">
+                    <button className="btn btn-sm" disabled={busy || !textDraft.trim()} onClick={() => void organize()}>
+                      {busy ? '整理中…' : 'AI 整理文本'}
+                    </button>
+                  </div>
                 )}
               </div>
 

@@ -666,6 +666,29 @@ body {
   font-weight: 700;
 }
 
+.pt-tabs-inline {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.music-tabs-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--lf-line);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.music-tabs-row .pt-tab {
+  margin-bottom: -1px;
+}
+
+.music-tabs-action {
+  padding-bottom: 8px;
+}
+
 .pt-body {
   min-height: 60px;
 }

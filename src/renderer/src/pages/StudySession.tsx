@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { GradePayload, WordDetailData } from '../../../shared/types'
+import type { GradePayload, SentenceFavoriteItem, WordDetailData } from '../../../shared/types'
 import MasteryDots from '../components/MasteryDots'
 
 const SCORE_DIMS: Array<{ key: keyof GradePayload['scores']; label: string }> = [
@@ -40,12 +40,15 @@ export default function StudySession(): React.JSX.Element {
   const [word, setWord] = useState<WordDetailData | null>(null)
   const [explain, setExplain] = useState('')
   const [explainCollapsed, setExplainCollapsed] = useState(false)
+  const [promptIdx, setPromptIdx] = useState(0)
   const [sentence, setSentence] = useState('')
   const [grade, setGrade] = useState<{ sentence: string; grade: GradePayload } | null>(null)
+  const [favs, setFavs] = useState<SentenceFavoriteItem[]>([])
   const [busy, setBusy] = useState<'explain' | 'grade' | null>(null)
   const [error, setError] = useState('')
   const [finished, setFinished] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState('')
 
   useEffect(() => {
     void window.lexi.studyQueue().then((ids) => {
@@ -62,10 +65,17 @@ export default function StudySession(): React.JSX.Element {
       // 已有缓存讲解说明读过一遍，默认收起给练习腾地方；新讲解默认展开
       setExplainCollapsed(Boolean(cached))
       setGrade(w ? latestGrade(w) : null)
+      setPromptIdx(0)
       setSentence('')
       setError('')
     })
+    void window.lexi.listFavorites(id).then(setFavs)
   }, [])
+
+  function flash(msg: string): void {
+    setToast(msg)
+    window.setTimeout(() => setToast(''), 2200)
+  }
 
   useEffect(() => {
     if (queue[idx] !== undefined) loadWord(queue[idx])
@@ -111,6 +121,16 @@ export default function StudySession(): React.JSX.Element {
     else setFinished(true)
   }
 
+  async function favoriteRevised(): Promise<void> {
+    if (!word || !grade?.grade.revised.trim()) return
+    try {
+      setFavs(await window.lexi.addFavorite(word.id, grade.grade.revised, 'revised'))
+      flash('已收藏修改后的句子')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   if (loading) {
     return (
       <section>
@@ -148,7 +168,8 @@ export default function StudySession(): React.JSX.Element {
     )
   }
 
-  const hint = word?.prompts[0]
+  const alreadyFav =
+    !!grade && !!grade.grade.revised.trim() && favs.some((f) => f.sentence === grade.grade.revised.trim())
 
   return (
     <section>
@@ -207,7 +228,16 @@ export default function StudySession(): React.JSX.Element {
           <div className="card module-card" style={{ marginTop: 16 }}>
             <h3 className="card-h3">句子练习</h3>
             <p className="section-note">用「{word.headword}」写一个句子或短段落，AI 会从四个维度给反馈。</p>
-            {hint && <p className="prompt-hint">💡 造句提示：{hint}</p>}
+            {word.prompts.length > 0 && (
+              <p className="prompt-hint">
+                💡 造句提示：{word.prompts[promptIdx % word.prompts.length]}
+                {word.prompts.length > 1 && (
+                  <button className="text-btn prompt-next" disabled={busy !== null} onClick={() => setPromptIdx((i) => i + 1)}>
+                    换一句 ↻
+                  </button>
+                )}
+              </p>
+            )}
             <textarea
               className="notes-area"
               value={sentence}
@@ -256,9 +286,18 @@ export default function StudySession(): React.JSX.Element {
                   </ul>
                 )}
                 {grade.grade.revised && (
-                  <p className="revised-line">
-                    修改后：<span>{grade.grade.revised}</span>
-                  </p>
+                  <div className="revised-row">
+                    <p className="revised-line">
+                      修改后：<span>{grade.grade.revised}</span>
+                    </p>
+                    <button
+                      className={'text-btn fav-btn' + (alreadyFav ? ' fav-done' : '')}
+                      disabled={alreadyFav}
+                      onClick={() => void favoriteRevised()}
+                    >
+                      {alreadyFav ? '★ 已收藏' : '☆ 收藏此句'}
+                    </button>
+                  </div>
                 )}
                 {grade.grade.comment && <p className="section-note">{grade.grade.comment}</p>}
               </>
@@ -287,6 +326,7 @@ export default function StudySession(): React.JSX.Element {
               {idx === queue.length - 1 ? '完成本组 ✓' : '下一个词 →'}
             </button>
           </div>
+          {toast && <div className="toast">{toast}</div>}
         </>
       )}
     </section>

@@ -26,7 +26,10 @@ import {
   listTasks,
   addTask,
   removeTask,
-  toggleTask
+  toggleTask,
+  listFavorites,
+  addFavorite,
+  removeFavorite
 } from './study'
 import type { AppSettings, SettingsPatch, AiTestResult, WordUpdatePatch, SettingsPatch as Patch } from '../shared/types'
 import { runSelfTest } from './selftest'
@@ -124,6 +127,12 @@ app.whenReady().then(() => {
   ipcMain.handle('tasks:remove', (_e, id: number) => removeTask(Number(id)))
   ipcMain.handle('tasks:toggle', (_e, id: number, done: boolean) => toggleTask(Number(id), Boolean(done)))
 
+  ipcMain.handle('fav:list', (_e, wordId: number) => listFavorites(Number(wordId)))
+  ipcMain.handle('fav:add', (_e, wordId: number, sentence: string, source: string) =>
+    addFavorite(Number(wordId), String(sentence ?? ''), String(source ?? 'revised'))
+  )
+  ipcMain.handle('fav:remove', (_e, id: number) => removeFavorite(Number(id)))
+
   const win = createWindow()
   console.log('[lexiflow] window created, db ready')
 
@@ -155,7 +164,8 @@ app.whenReady().then(() => {
         summary: todaySummary,
         queue: todayQueue,
         selectBook,
-        tasks: { list: listTasks, add: addTask, toggle: toggleTask, remove: removeTask }
+        tasks: { list: listTasks, add: addTask, toggle: toggleTask, remove: removeTask },
+        favs: { list: listFavorites, add: addFavorite, remove: removeFavorite }
       },
       mastery: { applyGradeToMastery, average: masteryAverage }
     })

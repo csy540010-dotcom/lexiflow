@@ -89,6 +89,15 @@ function migrate(db: Database.Database): void {
       date TEXT NOT NULL,
       UNIQUE(task_id, date)
     );
+
+    CREATE TABLE IF NOT EXISTS sentence_favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      word_id INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+      sentence TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'revised',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_fav_word ON sentence_favorites(word_id);
   `)
 }
 

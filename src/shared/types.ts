@@ -184,3 +184,11 @@ export interface CustomTaskItem {
   doneToday: boolean
 }
 
+export interface SentenceFavoriteItem {
+  id: number
+  wordId: number
+  sentence: string
+  source: string
+  createdAt: string
+}
+

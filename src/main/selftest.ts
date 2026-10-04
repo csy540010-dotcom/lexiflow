@@ -43,6 +43,11 @@ interface StudyHooks {
   queue: (bookId?: number) => number[]
   selectBook: (bookId: number) => void
   tasks: TaskHooks
+  favs: {
+    list: (wordId: number) => Array<{ id: number; wordId: number; sentence: string; source: string; createdAt: string }>
+    add: (wordId: number, sentence: string, source: string) => Array<{ id: number }>
+    remove: (id: number) => Array<{ id: number }>
+  }
 }
 
 interface MasteryHooks {
@@ -201,6 +206,15 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(tasks[0].doneToday === false, '自定义任务：取消打卡')
     tasks = hooks.study.tasks.remove(tasks[0].id)
     assert(tasks.length === 0, '自定义任务：删除')
+
+    // 9.7 句子收藏（去重 + 删除）
+    const favTarget = q[0]
+    let favs = hooks.study.favs.add(favTarget, 'The road ended abruptly.', 'revised')
+    assert(favs.length === 1 && favs[0].source === 'revised', '句子收藏：添加')
+    favs = hooks.study.favs.add(favTarget, 'The road ended abruptly.', 'revised')
+    assert(favs.length === 1, '句子收藏：重复添加自动去重')
+    favs = hooks.study.favs.remove(favs[0].id)
+    assert(favs.length === 0, '句子收藏：删除')
 
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })

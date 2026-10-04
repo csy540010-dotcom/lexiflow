@@ -14,7 +14,8 @@ import type {
   TodaySummary,
   ExplainResult,
   GradeResponse,
-  CustomTaskItem
+  CustomTaskItem,
+  SentenceFavoriteItem
 } from '../shared/types'
 
 const api = {
@@ -51,7 +52,12 @@ const api = {
   addTask: (kind: string, title: string, target: string): Promise<CustomTaskItem[]> =>
     ipcRenderer.invoke('tasks:add', kind, title, target),
   removeTask: (id: number): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:remove', id),
-  toggleTask: (id: number, done: boolean): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:toggle', id, done)
+  toggleTask: (id: number, done: boolean): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:toggle', id, done),
+
+  listFavorites: (wordId: number): Promise<SentenceFavoriteItem[]> => ipcRenderer.invoke('fav:list', wordId),
+  addFavorite: (wordId: number, sentence: string, source: string): Promise<SentenceFavoriteItem[]> =>
+    ipcRenderer.invoke('fav:add', wordId, sentence, source),
+  removeFavorite: (id: number): Promise<SentenceFavoriteItem[]> => ipcRenderer.invoke('fav:remove', id)
 }
 
 export type LexiApi = typeof api

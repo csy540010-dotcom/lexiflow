@@ -4,7 +4,7 @@ import { buildExplainPrompt, buildGradePrompt, extractJson, type GradeResult } f
 import { applyGradeToMastery, masteryAverage } from './mastery'
 import { getWord } from './library'
 import { getAiConfig } from './settings'
-import type { CustomTaskItem, TodaySummary } from '../shared/types'
+import type { CustomTaskItem, TodaySummary, SentenceFavoriteItem } from '../shared/types'
 
 function planNumber(meta: 'dailyNew' | 'dailyReviewLimit' | 'dailyMinutes' | 'reviewIntensity'): number {
   try {
@@ -206,4 +206,41 @@ export function toggleTask(id: number, done: boolean): CustomTaskItem[] {
       .run(Number(id), todayKey())
   }
   return listTasks()
+}
+
+/* ── 句子收藏 ─────────────── */
+
+function mapFav(r: { id: number; word_id: number; sentence: string; source: string; created_at: string }): SentenceFavoriteItem {
+  return { id: r.id, wordId: r.word_id, sentence: r.sentence, source: r.source, createdAt: r.created_at }
+}
+
+export function listFavorites(wordId: number): SentenceFavoriteItem[] {
+  return (
+    getDb()
+      .prepare('SELECT id, word_id, sentence, source, created_at FROM sentence_favorites WHERE word_id = ? ORDER BY id DESC')
+      .all(Number(wordId))
+      .map((r) => mapFav(r as { id: number; word_id: number; sentence: string; source: string; created_at: string }))
+  )
+}
+
+export function addFavorite(wordId: number, sentence: string, source: string): SentenceFavoriteItem[] {
+  const text = sentence.trim()
+  if (!text) throw new Error('句子为空，不能收藏。')
+  const dup = getDb()
+    .prepare('SELECT id FROM sentence_favorites WHERE word_id = ? AND sentence = ?')
+    .get(Number(wordId), text)
+  if (!dup) {
+    getDb()
+      .prepare("INSERT INTO sentence_favorites (word_id, sentence, source) VALUES (?, ?, ?)")
+      .run(Number(wordId), text, source === 'original' ? 'original' : 'revised')
+  }
+  return listFavorites(wordId)
+}
+
+export function removeFavorite(id: number): SentenceFavoriteItem[] {
+  const row = getDb().prepare('SELECT word_id FROM sentence_favorites WHERE id = ?').get(Number(id)) as
+    | { word_id: number }
+    | undefined
+  getDb().prepare('DELETE FROM sentence_favorites WHERE id = ?').run(Number(id))
+  return row ? listFavorites(row.word_id) : []
 }

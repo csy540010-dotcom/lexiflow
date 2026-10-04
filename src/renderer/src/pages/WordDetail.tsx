@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { WordDetailData } from '../../../shared/types'
+import type { SentenceFavoriteItem, WordDetailData } from '../../../shared/types'
 import MasteryDots from '../components/MasteryDots'
 
 const MASTERY_DIMS: Array<{ key: 'recognition' | 'comprehension' | 'production' | 'transfer'; label: string }> = [
@@ -19,6 +19,7 @@ export default function WordDetail(): React.JSX.Element {
   const ids = (location.state as { ids?: number[] } | null)?.ids ?? null
 
   const [word, setWord] = useState<WordDetailData | null>(null)
+  const [favs, setFavs] = useState<SentenceFavoriteItem[]>([])
   const [notes, setNotes] = useState('')
   const [toast, setToast] = useState('')
   const notesTimer = useRef<number | undefined>(undefined)
@@ -27,6 +28,7 @@ export default function WordDetail(): React.JSX.Element {
     const w = await window.lexi.getWord(wordId)
     setWord(w)
     setNotes(w?.notes ?? '')
+    setFavs(await window.lexi.listFavorites(wordId))
   }, [])
 
   useEffect(() => {
@@ -155,6 +157,31 @@ export default function WordDetail(): React.JSX.Element {
           onChange={(e) => saveNotes(e.target.value)}
           placeholder="写下自己的理解、例句或联想…自动保存"
         />
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 className="card-h3">句子收藏</h3>
+        {favs.length === 0 ? (
+          <p className="stub-note">还没有收藏。学习时批改给出「修改后」的句子，点旁边的 ☆ 就能存进来。</p>
+        ) : (
+          <ul className="fav-list">
+            {favs.map((f) => (
+              <li key={f.id} className="fav-item">
+                <p className="fav-sentence">{f.sentence}</p>
+                <div className="fav-meta">
+                  <span>{f.source === 'original' ? '原句' : '修改后'}</span>
+                  <span>{f.createdAt.slice(0, 10)}</span>
+                  <button
+                    className="text-btn task-remove"
+                    onClick={async () => setFavs(await window.lexi.removeFavorite(f.id))}
+                  >
+                    删除
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

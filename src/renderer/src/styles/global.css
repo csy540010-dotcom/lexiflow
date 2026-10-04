@@ -1382,12 +1382,71 @@ body {
 .word-popup {
   position: fixed;
   z-index: 31;
-  width: 300px;
+  width: 340px;
   background: var(--lf-card);
   border: 1px solid var(--lf-line);
   border-radius: 12px;
   padding: 14px 16px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.popup-phrase-head {
+  font-size: 15px;
+}
+
+.popup-phrase-text {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--lf-muted);
+  line-height: 1.8;
+  border-left: 3px solid var(--lf-line);
+  padding-left: 10px;
+  word-break: break-word;
+}
+
+.popup-book-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.popup-book-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--lf-line);
+  border-radius: 8px;
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.popup-translate {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--lf-line);
+}
+
+.popup-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--lf-accent);
+  font-weight: 700;
+}
+
+.popup-translation-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 2;
+}
+
+.popup-hint-link {
+  color: var(--lf-accent);
 }
 
 .word-popup-head {

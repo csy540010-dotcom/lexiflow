@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { getDb } from './db'
 import type {
   AppSettings,
@@ -104,8 +105,9 @@ export interface SelfTestHooks {
     create: (title: string, content: string, source: string) => { id: number; title: string; chars: number }
     delete: (id: number) => void
     log: (id: number) => void
-    lookup: (word: string) => { word: string; found: boolean; phonetic: string; meaning: string; inBook: boolean; wordId?: number }
-    addWord: (headword: string) => { word: { id: number } | null; added: boolean }
+    lookup: (word: string, bookId?: number) => { word: string; found: boolean; phonetic: string; meaning: string; inBook: boolean; wordId?: number; bookId: number }
+    addWord: (headword: string, bookId?: number) => { word: { id: number } | null; added: boolean }
+    translate: (text: string) => Promise<{ translated: string; cached: boolean }>
   }
   music: {
     list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[] }>
@@ -379,6 +381,26 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
       afterDelete.readingChars === baselineM6.readingChars && !hooks.reading.list().some((a) => a.id === article.id),
       '阅读：删除文章（统计同步回退）'
     )
+
+    // 9.965 阅读增强：翻译缓存（本地命中，不打 AI）+ 自定义书加词进学习队列
+    const srcText = 'Selftest cached sentence for translation.'
+    const srcHash = crypto.createHash('md5').update(srcText).digest('hex')
+    getDb()
+      .prepare('INSERT OR REPLACE INTO translation_cache (hash, source, translated) VALUES (?, ?, ?)')
+      .run(srcHash, srcText, '自检缓存译文。')
+    const tr = await hooks.reading.translate(srcText)
+    assert(tr.cached && tr.translated === '自检缓存译文。', '阅读：整段翻译命中本地缓存（不打 AI）')
+    getDb().prepare('DELETE FROM translation_cache WHERE hash = ?').run(srcHash)
+    const customBookId = hooks.library.createBook('M6自检自定义书')
+    assert(hooks.reading.lookup('abruptly', customBookId).inBook === false, '自定义书：查词按所选书判断')
+    const addedCustom = hooks.reading.addWord('lexiflowcustomword', customBookId)
+    assert(addedCustom.added && !!addedCustom.word, '自定义书：生词加入')
+    const customList = hooks.library.queryWords({ bookId: customBookId })
+    assert(customList.total === 1 && customList.items[0].status === 0 && customList.items[0].headword === 'lexiflowcustomword',
+      '自定义书：新词状态=未学习（可进入造句训练队列）')
+    assert(hooks.reading.lookup('lexiflowcustomword', customBookId).inBook === true, '自定义书：加入后查词状态正确')
+    hooks.library.deleteBook(customBookId)
+    assert(hooks.library.queryWords({ bookId: customBookId }).total === 0, '自定义书：删除后词条清理')
 
     // 9.97 音乐听力：导入音频 → 听力时间 → 删除（连带删除副本）
     const audioSrc = path.join(selftestDir, 'm6-audio.mp3')

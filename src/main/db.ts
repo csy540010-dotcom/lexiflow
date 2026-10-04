@@ -127,6 +127,13 @@ function migrate(db: Database.Database): void {
       date TEXT PRIMARY KEY,
       seconds INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS translation_cache (
+      hash TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      translated TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `)
   // 旧库补列：mastered_at（M5 新掌握词统计用；新库在 CREATE TABLE 里自带）
   try {

@@ -241,6 +241,7 @@ export interface DictLookup {
   meaning: string
   inBook: boolean
   wordId?: number
+  bookId: number
 }
 
 export interface TrackItem {

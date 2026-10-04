@@ -31,7 +31,8 @@ import {
   logReading,
   lookupWord,
   addWordToBook,
-  importTextFile
+  importTextFile,
+  translateReading
 } from './reading'
 import {
   listTracks,
@@ -242,8 +243,11 @@ app.whenReady().then(() => {
   )
   ipcMain.handle('reading:delete', (_e, id: number) => deleteArticle(Number(id)))
   ipcMain.handle('reading:log', (_e, id: number) => logReading(Number(id)))
-  ipcMain.handle('reading:lookup', (_e, word: string) => lookupWord(String(word ?? '')))
-  ipcMain.handle('reading:addWord', (_e, headword: string) => addWordToBook(String(headword ?? '')))
+  ipcMain.handle('reading:lookup', (_e, word: string, bookId?: number) => lookupWord(String(word ?? ''), bookId ? Number(bookId) : undefined))
+  ipcMain.handle('reading:addWord', (_e, headword: string, bookId?: number) =>
+    addWordToBook(String(headword ?? ''), bookId ? Number(bookId) : undefined)
+  )
+  ipcMain.handle('reading:translate', (_e, text: string) => translateReading(String(text ?? '')))
   ipcMain.handle('reading:importFile', async () => {
     const result = await dialog.showOpenDialog({
       title: '导入文章',
@@ -324,7 +328,8 @@ app.whenReady().then(() => {
         delete: deleteArticle,
         log: logReading,
         lookup: lookupWord,
-        addWord: addWordToBook
+        addWord: addWordToBook,
+        translate: translateReading
       },
       music: {
         list: listTracks,

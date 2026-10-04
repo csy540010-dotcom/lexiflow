@@ -91,9 +91,11 @@ const api = {
     ipcRenderer.invoke('reading:create', title, content, source),
   deleteArticle: (id: number): Promise<void> => ipcRenderer.invoke('reading:delete', id),
   logReading: (id: number): Promise<void> => ipcRenderer.invoke('reading:log', id),
-  lookupWord: (word: string): Promise<DictLookup> => ipcRenderer.invoke('reading:lookup', word),
-  addWordToBook: (headword: string): Promise<{ word: WordDetailData | null; added: boolean }> =>
-    ipcRenderer.invoke('reading:addWord', headword),
+  lookupWord: (word: string, bookId?: number): Promise<DictLookup> => ipcRenderer.invoke('reading:lookup', word, bookId),
+  addWordToBook: (headword: string, bookId?: number): Promise<{ word: WordDetailData | null; added: boolean }> =>
+    ipcRenderer.invoke('reading:addWord', headword, bookId),
+  translateReading: (text: string): Promise<{ translated: string; cached: boolean }> =>
+    ipcRenderer.invoke('reading:translate', text),
   importArticleFile: (): Promise<ArticleItem | null> => ipcRenderer.invoke('reading:importFile'),
 
   listTracks: (): Promise<TrackItem[]> => ipcRenderer.invoke('music:list'),

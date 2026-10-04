@@ -101,6 +101,16 @@ export function buildOrganizeTextPrompt(title: string, text: string): string {
     .join('\n')
 }
 
+/** 阅读翻译（整段 / 短语 / 生词上下文）：只输出译文。 */
+export function buildTranslatePrompt(text: string): string {
+  return [
+    '把下面的英文翻译成自然、流畅、准确的中文，面向中文母语的英语学习者。',
+    '只输出译文本身，不要任何解释、单词注释、标题、引号或原文。',
+    '',
+    text
+  ].join('\n')
+}
+
 export interface GradeResult {
   scores: GradeScores
   revised: string

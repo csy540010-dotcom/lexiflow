@@ -118,6 +118,7 @@ export interface SelfTestHooks {
     setNotes: (id: number, notes: string) => { id: number; notes: string }
     setDuration: (id: number, seconds: number) => { id: number; duration: number }
     setCollection: (id: number, name: string) => { id: number; collection: string }
+    collections: () => string[]
     importCover: (id: number, srcPath: string) => { id: number; coverFile: string }
     setCoverLib: (id: number, coverId: string) => { id: number; coverId: string; coverFile: string }
     clearSegments: (id: number) => { id: number; segments: string[] }
@@ -492,6 +493,7 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     hooks.music.setDuration(track.id, 754.4)
     assert(hooks.music.list().find((t) => t.id === track.id)?.duration === 754, '听力：播放时长记录（列表显示用）')
     assert(hooks.music.setCollection(track.id, '真题听力').collection === '真题听力', '听力：集合归类')
+    assert(hooks.music.collections().includes('真题听力'), '听力：集合列表包含新建的集合')
     const coverSrc = path.join(selftestDir, 'm6-cover.png')
     fs.writeFileSync(coverSrc, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]))
     const withCover = hooks.music.importCover(track.id, coverSrc)

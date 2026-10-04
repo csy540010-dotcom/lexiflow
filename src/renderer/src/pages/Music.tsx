@@ -3,6 +3,7 @@ import type { MusicWordItem, TrackItem } from '../../../shared/types'
 import { waveHeights } from '../lib/covers'
 import { CoverArtAuto, CoverArtById } from '../components/CoverArt'
 import CoverPicker from '../components/CoverPicker'
+import CollectionPicker from '../components/CollectionPicker'
 
 function fmtTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '00:00'
@@ -44,7 +45,6 @@ export default function Music(): React.JSX.Element {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [textDraft, setTextDraft] = useState('')
   const [notesDraft, setNotesDraft] = useState('')
-  const [collectionDraft, setCollectionDraft] = useState('')
   const [words, setWords] = useState<MusicWordItem[] | null>(null)
   const [wordsBusy, setWordsBusy] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -54,6 +54,8 @@ export default function Music(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<{ id: number; done: number; total: number } | null>(null)
   const [showCoverPicker, setShowCoverPicker] = useState(false)
+  const [showCollections, setShowCollections] = useState(false)
+  const [collectionList, setCollectionList] = useState<string[]>([])
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -132,7 +134,6 @@ export default function Music(): React.JSX.Element {
     setSelected(track)
     setTextDraft(track.textContent)
     setNotesDraft(track.notes)
-    setCollectionDraft(track.collection)
     setTab(track.segments.length > 0 ? 'organized' : 'raw')
     setWords(null)
     setProgress(null)
@@ -153,13 +154,18 @@ export default function Music(): React.JSX.Element {
     }
   }
 
-  async function saveCollection(): Promise<void> {
+  async function openCollectionPicker(): Promise<void> {
     if (!selected) return
-    const trimmed = collectionDraft.trim()
-    if (trimmed === selected.collection) return
-    const updated = await window.lexi.setTrackCollection(selected.id, trimmed)
+    setCollectionList(await window.lexi.listCollections())
+    setShowCollections(true)
+  }
+
+  async function pickCollection(name: string): Promise<void> {
+    if (!selected) return
+    const updated = await window.lexi.setTrackCollection(selected.id, name)
     applyUpdated(updated)
-    flash(trimmed ? `已归入集合「${trimmed}」` : '已移出集合（未分类）')
+    setShowCollections(false)
+    flash(name ? `已归入集合「${name}」` : '已移到「未分类」')
   }
 
   async function changeCover(): Promise<void> {
@@ -380,16 +386,11 @@ export default function Music(): React.JSX.Element {
                     </div>
                     <div className="collection-line">
                       <span>集合：</span>
-                      <input
-                        className="collection-input"
-                        value={collectionDraft}
-                        placeholder="未分类（输入后回车归类）"
-                        onChange={(e) => setCollectionDraft(e.target.value)}
-                        onBlur={() => void saveCollection()}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                        }}
-                      />
+                      <button className="collection-btn" onClick={() => void openCollectionPicker()}>
+                        {selected.collection || '未分类'}
+                        <span className="collection-caret">▾</span>
+                      </button>
+                      <span className="hint">点这里归类 / 新建集合</span>
                     </div>
                   </div>
                   <div className="player-head-actions">
@@ -579,6 +580,15 @@ export default function Music(): React.JSX.Element {
           onPick={(id) => void pickCoverFromLib(id)}
           onUpload={() => void changeCover()}
           onClose={() => setShowCoverPicker(false)}
+        />
+      )}
+
+      {showCollections && selected && (
+        <CollectionPicker
+          current={selected.collection}
+          collections={collectionList}
+          onPick={(name) => void pickCollection(name)}
+          onClose={() => setShowCollections(false)}
         />
       )}
     </section>

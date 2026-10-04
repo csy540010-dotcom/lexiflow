@@ -113,6 +113,7 @@ const api = {
     ipcRenderer.invoke('music:setDuration', id, seconds),
   setTrackCollection: (id: number, name: string): Promise<TrackItem> =>
     ipcRenderer.invoke('music:setCollection', id, name),
+  listCollections: (): Promise<string[]> => ipcRenderer.invoke('music:collections'),
   pickTrackCover: (id: number): Promise<TrackItem | null> => ipcRenderer.invoke('music:pickCover', id),
   clearTrackSegments: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:clearSegments', id),
   setTrackCoverLib: (id: number, coverId: string): Promise<TrackItem> =>

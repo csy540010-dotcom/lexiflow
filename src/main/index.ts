@@ -44,6 +44,7 @@ import {
   setTrackNotes,
   setTrackDuration,
   setTrackCollection,
+  listCollections,
   importCover,
   clearSegments,
   setTrackCoverLib,
@@ -299,6 +300,7 @@ app.whenReady().then(() => {
   ipcMain.handle('music:setCollection', (_e, id: number, name: string) =>
     setTrackCollection(Number(id), String(name ?? ''))
   )
+  ipcMain.handle('music:collections', () => listCollections())
   ipcMain.handle('music:pickCover', async (_e, id: number) => {
     const result = await dialog.showOpenDialog({
       title: '选择封面图片',
@@ -394,6 +396,7 @@ app.whenReady().then(() => {
         setNotes: setTrackNotes,
         setDuration: setTrackDuration,
         setCollection: setTrackCollection,
+        collections: listCollections,
         importCover,
         setCoverLib: setTrackCoverLib,
         clearSegments,

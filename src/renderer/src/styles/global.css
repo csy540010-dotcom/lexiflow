@@ -908,10 +908,46 @@ body {
 .collection-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   color: var(--lf-muted);
   margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.collection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--lf-line);
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.collection-btn:hover {
+  border-color: var(--lf-accent);
+  color: var(--lf-accent);
+}
+
+.collection-caret {
+  font-size: 10px;
+  color: var(--lf-muted);
+}
+
+.collection-new-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.collection-new-row input {
+  flex: 1;
+  min-width: 0;
 }
 
 .collection-input {

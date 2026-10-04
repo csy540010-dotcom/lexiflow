@@ -130,6 +130,15 @@ export function setTrackCollection(id: number, name: string): TrackItem {
   return mapTrack(row)
 }
 
+/** 现有集合列表（归类弹窗用）。 */
+export function listCollections(): string[] {
+  return (
+    getDb()
+      .prepare("SELECT DISTINCT collection FROM tracks WHERE collection != '' ORDER BY collection")
+      .all() as Array<{ collection: string }>
+  ).map((r) => r.collection)
+}
+
 /** 导入封面图：复制进 App 数据目录（替换旧封面时清理旧文件）。 */
 export function importCover(id: number, srcPath: string): TrackItem {
   if (!fs.existsSync(srcPath)) throw new Error('图片文件不存在。')

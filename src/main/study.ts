@@ -1,10 +1,10 @@
 import { kvGet, kvSet, getDb } from './db'
 import { chatCompletion } from './ai'
-import { buildExplainPrompt, buildGradePrompt, buildGenPromptsPrompt, extractJson, extractPrompts, type GradeResult } from './prompts'
+import { buildExplainPrompt, buildGradePrompt, buildGenPromptsPrompt, buildWordProfilePrompt, extractJson, extractJsonObject, extractPrompts, type GradeResult } from './prompts'
 import { applyGradeToMastery, masteryAverage } from './mastery'
 import { getWord } from './library'
 import { getAiConfig } from './settings'
-import type { CustomTaskItem, TodaySummary, SentenceFavoriteItem } from '../shared/types'
+import type { CustomTaskItem, TodaySummary, SentenceFavoriteItem, WordProfile } from '../shared/types'
 
 export function planNumber(meta: 'dailyNew' | 'dailyReviewLimit' | 'dailyMinutes' | 'reviewIntensity'): number {
   try {
@@ -209,6 +209,64 @@ export async function generatePrompts(wordId: number): Promise<{ prompts: string
   if (prompts.length === 0) throw new Error('AI 返回格式异常，请重试一次。')
   getDb().prepare('UPDATE words SET prompts = ? WHERE id = ?').run(JSON.stringify(prompts), wordId)
   return { prompts }
+}
+
+/** 单词详情：AI 结构化学习资料（释义与用法 / 例句 / 搭配 / 相关词 / 词形变化），本地缓存。 */
+function normalizeProfile(raw: unknown): WordProfile | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : [])
+  const objArr = (v: unknown, k1: string, k2: string): Array<Record<string, string>> =>
+    Array.isArray(v)
+      ? v
+          .map((x) => {
+            const it = x as Record<string, unknown>
+            return { [k1]: String(it?.[k1] ?? '').trim(), [k2]: String(it?.[k2] ?? '').trim() }
+          })
+          .filter((it) => it[k1])
+      : []
+  const profile: WordProfile = {
+    definitions: strArr(o.definitions),
+    examples: objArr(o.examples, 'en', 'zh') as WordProfile['examples'],
+    collocations: objArr(o.collocations, 'phrase', 'zh') as WordProfile['collocations'],
+    related: objArr(o.related, 'word', 'zh') as WordProfile['related'],
+    forms: strArr(o.forms)
+  }
+  if (profile.definitions.length === 0 && profile.examples.length === 0) return null
+  return profile
+}
+
+export async function generateWordProfile(wordId: number): Promise<{ profile: WordProfile; cached: boolean }> {
+  const word = getWord(wordId)
+  if (!word) throw new Error('词条不存在。')
+  const db = getDb()
+  const existing = db
+    .prepare("SELECT payload FROM learning_records WHERE word_id = ? AND kind = 'ai_profile' ORDER BY id DESC LIMIT 1")
+    .get(wordId) as { payload: string } | undefined
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing.payload) as { profile?: unknown }
+      const profile = normalizeProfile(parsed.profile)
+      if (profile) return { profile, cached: true }
+    } catch {
+      /* 重新生成 */
+    }
+  }
+  const cfg = getAiConfig()
+  if (!cfg.baseUrl || !cfg.model) throw new Error('还没有配置 AI：请到「设置 → AI 配置」完成配置。')
+  const raw = await chatCompletion(
+    cfg,
+    [{ role: 'user', content: buildWordProfilePrompt(word.headword, word.phonetic, word.meaning) }],
+    { maxTokens: 1600, timeoutMs: 90_000 }
+  )
+  const profile = normalizeProfile(extractJsonObject(raw))
+  if (!profile) throw new Error('AI 返回格式异常，请重试一次。')
+  db.prepare("DELETE FROM learning_records WHERE word_id = ? AND kind = 'ai_profile'").run(wordId)
+  db.prepare("INSERT INTO learning_records (word_id, kind, payload) VALUES (?, 'ai_profile', ?)").run(
+    wordId,
+    JSON.stringify({ profile })
+  )
+  return { profile, cached: false }
 }
 
 /* ── 自定义任务（听力 / 阅读 / 写作…） ─────────────── */

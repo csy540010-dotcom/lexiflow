@@ -23,7 +23,9 @@ import type {
   StatsSummary,
   ArticleItem,
   DictLookup,
-  TrackItem
+  TrackItem,
+  WordProfile,
+  MusicWordItem
 } from '../shared/types'
 
 const api = {
@@ -55,6 +57,8 @@ const api = {
   selectedBook: (): Promise<number | null> => ipcRenderer.invoke('study:selectedBook'),
   explainWord: (wordId: number): Promise<ExplainResult> => ipcRenderer.invoke('study:explain', wordId),
   genPrompts: (wordId: number): Promise<{ prompts: string[] }> => ipcRenderer.invoke('study:genPrompts', wordId),
+  generateWordProfile: (wordId: number): Promise<{ profile: WordProfile; cached: boolean }> =>
+    ipcRenderer.invoke('study:profile', wordId),
   gradeSentence: (wordId: number, sentence: string): Promise<GradeResponse> =>
     ipcRenderer.invoke('study:submit', wordId, sentence),
   listTasks: (): Promise<CustomTaskItem[]> => ipcRenderer.invoke('tasks:list'),
@@ -101,6 +105,8 @@ const api = {
   listTracks: (): Promise<TrackItem[]> => ipcRenderer.invoke('music:list'),
   importAudio: (): Promise<TrackItem | null> => ipcRenderer.invoke('music:import'),
   setTrackText: (id: number, text: string): Promise<TrackItem> => ipcRenderer.invoke('music:setText', id, text),
+  setTrackNotes: (id: number, notes: string): Promise<TrackItem> => ipcRenderer.invoke('music:setNotes', id, notes),
+  extractTrackWords: (id: number): Promise<MusicWordItem[]> => ipcRenderer.invoke('music:words', id),
   deleteTrack: (id: number): Promise<TrackItem[]> => ipcRenderer.invoke('music:delete', id),
   organizeTrack: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:organize', id),
   listeningTick: (seconds: number): Promise<void> => ipcRenderer.invoke('music:tick', seconds)

@@ -45,6 +45,7 @@ interface StudyHooks {
   queue: (bookId?: number) => number[]
   selectBook: (bookId: number) => void
   genPrompts: (wordId: number) => Promise<{ prompts: string[] }>
+  profile: (wordId: number) => Promise<{ profile: { definitions: string[]; examples: Array<{ en: string; zh: string }> }; cached: boolean }>
   tasks: TaskHooks
   favs: {
     list: (wordId: number) => Array<{ id: number; wordId: number; sentence: string; source: string; createdAt: string }>
@@ -110,9 +111,11 @@ export interface SelfTestHooks {
     translate: (text: string) => Promise<{ translated: string; cached: boolean }>
   }
   music: {
-    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[] }>
+    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[]; notes: string }>
     importFromPath: (srcPath: string) => { id: number; title: string; audioFile: string }
     setText: (id: number, text: string) => { id: number; textContent: string }
+    setNotes: (id: number, notes: string) => { id: number; notes: string }
+    words: (id: number) => Array<{ word: string; meaning: string; inBook: boolean }>
     remove: (id: number) => Array<{ id: number }>
     tick: (seconds: number) => void
     untick: (seconds: number) => void
@@ -424,6 +427,31 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     hooks.library.deleteBook(customBookId)
     assert(hooks.library.queryWords({ bookId: customBookId }).total === 0, '自定义书：删除后词条清理')
 
+    // 9.91 单词详情增强：AI 词条缓存（本地命中，不打 AI）+ 手动标记已掌握补时间戳
+    const profWordId = q[0]
+    getDb()
+      .prepare("INSERT INTO learning_records (word_id, kind, payload) VALUES (?, 'ai_profile', ?)")
+      .run(
+        profWordId,
+        JSON.stringify({
+          profile: {
+            definitions: ['自检释义'],
+            examples: [{ en: 'Selftest example.', zh: '自检例句。' }],
+            collocations: [],
+            related: [],
+            forms: []
+          }
+        })
+      )
+    const prof = await hooks.study.profile(profWordId)
+    assert(prof.cached && prof.profile.definitions[0] === '自检释义', '单词详情：AI 词条命中本地缓存（不打 AI）')
+    getDb().prepare("DELETE FROM learning_records WHERE word_id = ? AND kind = 'ai_profile'").run(profWordId)
+    const beforeMaster = hooks.library.getWord(q[0])!
+    hooks.library.updateWord(q[0], { status: 2 })
+    const afterMaster = hooks.library.getWord(q[0])!
+    assert(afterMaster.status === 2, '单词详情：标记已掌握')
+    hooks.library.updateWord(q[0], { status: beforeMaster.status })
+
     // 9.97 音乐听力：导入音频 → 听力时间 → 删除（连带删除副本）
     const audioSrc = path.join(selftestDir, 'm6-audio.mp3')
     fs.mkdirSync(selftestDir, { recursive: true })
@@ -431,8 +459,16 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     const track = hooks.music.importFromPath(audioSrc)
     assert(track.id > 0 && track.audioFile.length > 0, `听力：导入音频（${track.audioFile}）`)
     assert(hooks.music.list().some((t) => t.id === track.id), '听力：列表包含新音频')
-    hooks.music.setText(track.id, 'First line of the transcript.\n\nSecond line.')
+    hooks.music.setText(track.id, 'The curious cat watched as the road ended abruptly.')
     assert(hooks.music.list().find((t) => t.id === track.id)?.textContent.length > 0, '听力：文本已保存')
+    const trackWords = hooks.music.words(track.id)
+    assert(
+      trackWords.some((w) => w.word === 'curious' && w.meaning.length > 0) &&
+        trackWords.some((w) => w.word === 'abruptly'),
+      `听力：生词析出（${trackWords.length} 个词，含 curious/abruptly）`
+    )
+    hooks.music.setNotes(track.id, '自检笔记：注意连读。')
+    assert(hooks.music.list().find((t) => t.id === track.id)?.notes === '自检笔记：注意连读。', '听力：笔记自动保存')
     hooks.music.tick(60)
     const withListen = hooks.stats.summary(7)
     assert(withListen.listeningMinutes === baselineM6.listeningMinutes + 1, `听力：听力时间 +1 分钟（${baselineM6.listeningMinutes} → ${withListen.listeningMinutes}）`)

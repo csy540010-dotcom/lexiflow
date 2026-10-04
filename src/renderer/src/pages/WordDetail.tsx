@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { SentenceFavoriteItem, WordDetailData } from '../../../shared/types'
+import type { SentenceFavoriteItem, WordDetailData, WordProfile } from '../../../shared/types'
 import MasteryDots from '../components/MasteryDots'
 
 const MASTERY_DIMS: Array<{ key: 'recognition' | 'comprehension' | 'production' | 'transfer'; label: string }> = [
@@ -12,6 +12,36 @@ const MASTERY_DIMS: Array<{ key: 'recognition' | 'comprehension' | 'production' 
 
 const STATUS_LABEL: Record<number, string> = { 0: '未学习', 1: '学习中', 2: '已掌握' }
 
+type ProfileTab = 'def' | 'ex' | 'coll' | 'rel' | 'forms'
+
+const PROFILE_TABS: Array<{ id: ProfileTab; label: string }> = [
+  { id: 'def', label: '释义与用法' },
+  { id: 'ex', label: '例句' },
+  { id: 'coll', label: '搭配' },
+  { id: 'rel', label: '相关词' },
+  { id: 'forms', label: '词形变化' }
+]
+
+function cachedProfile(word: WordDetailData): WordProfile | null {
+  const rec = [...word.records].reverse().find((r) => r.kind === 'ai_profile')
+  if (!rec) return null
+  const p = rec.payload as { profile?: WordProfile }
+  return p.profile ?? null
+}
+
+/** 系统朗读（Chromium 内置语音，离线可用）。 */
+function speak(word: string): void {
+  try {
+    const u = new SpeechSynthesisUtterance(word)
+    u.lang = 'en-US'
+    u.rate = 0.95
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(u)
+  } catch {
+    /* 无语音环境忽略 */
+  }
+}
+
 export default function WordDetail(): React.JSX.Element {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -22,6 +52,10 @@ export default function WordDetail(): React.JSX.Element {
   const [favs, setFavs] = useState<SentenceFavoriteItem[]>([])
   const [notes, setNotes] = useState('')
   const [toast, setToast] = useState('')
+  const [profile, setProfile] = useState<WordProfile | null>(null)
+  const [profileTab, setProfileTab] = useState<ProfileTab>('def')
+  const [profileBusy, setProfileBusy] = useState(false)
+  const [profileError, setProfileError] = useState('')
   const notesTimer = useRef<number | undefined>(undefined)
 
   const load = useCallback(async (wordId: number): Promise<void> => {
@@ -29,6 +63,8 @@ export default function WordDetail(): React.JSX.Element {
     setWord(w)
     setNotes(w?.notes ?? '')
     setFavs(await window.lexi.listFavorites(wordId))
+    setProfile(w ? cachedProfile(w) : null)
+    setProfileError('')
   }, [])
 
   useEffect(() => {
@@ -63,6 +99,31 @@ export default function WordDetail(): React.JSX.Element {
     if (updated) {
       setWord(updated)
       flash(target === 1 ? '已加入学习' : '已移回未学习')
+    }
+  }
+
+  async function markMastered(): Promise<void> {
+    if (!word) return
+    const updated = await window.lexi.updateWord(word.id, { status: 2 })
+    if (updated) {
+      setWord(updated)
+      flash('已标记为「已掌握」')
+    }
+  }
+
+  async function generateProfile(): Promise<void> {
+    if (!word) return
+    setProfileBusy(true)
+    setProfileError('')
+    try {
+      const r = await window.lexi.generateWordProfile(word.id)
+      setProfile(r.profile)
+      const w = await window.lexi.getWord(word.id)
+      if (w) setWord(w)
+    } catch (e) {
+      setProfileError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setProfileBusy(false)
     }
   }
 
@@ -114,6 +175,9 @@ export default function WordDetail(): React.JSX.Element {
           </button>
         </div>
         <p className="detail-phonetic">
+          <button className="speak-btn" title="朗读" onClick={() => speak(word.headword)}>
+            🔊
+          </button>
           {word.phonetic || '（词典暂无音标）'}
           <span className="detail-status">{STATUS_LABEL[word.status]}</span>
           {word.dueDate && <span className="detail-due">复习到期 {word.dueDate}</span>}
@@ -123,7 +187,107 @@ export default function WordDetail(): React.JSX.Element {
           <button className="btn" onClick={() => void startStudy()}>
             {word.status === 0 ? '加入今日学习' : word.status === 1 ? '移回未学习' : '重新学习'}
           </button>
+          {word.status !== 2 && (
+            <button className="btn btn-ghost" onClick={() => void markMastered()}>
+              ✓ 标记已掌握
+            </button>
+          )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-head-row">
+          <h3 className="card-h3">AI 释义与用法</h3>
+          {profile && (
+            <button className="text-btn" disabled={profileBusy} onClick={() => void generateProfile()}>
+              重新生成
+            </button>
+          )}
+        </div>
+        {profile ? (
+          <>
+            <div className="chips" style={{ marginTop: 4 }}>
+              {PROFILE_TABS.map((t) => (
+                <button
+                  key={t.id}
+                  className={'chip' + (profileTab === t.id ? ' chip-active' : '')}
+                  onClick={() => setProfileTab(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="profile-body">
+              {profileTab === 'def' && (
+                <ol className="profile-defs">
+                  {profile.definitions.map((d, i) => (
+                    <li key={i}>{d}</li>
+                  ))}
+                </ol>
+              )}
+              {profileTab === 'ex' && (
+                <ul className="profile-examples">
+                  {profile.examples.map((ex, i) => (
+                    <li key={i}>
+                      <p className="example-en">
+                        {ex.en}
+                        <button className="speak-btn speak-inline" title="朗读例句" onClick={() => speak(ex.en)}>
+                          🔊
+                        </button>
+                      </p>
+                      <p className="example-zh">{ex.zh}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {profileTab === 'coll' && (
+                <ul className="profile-coll">
+                  {profile.collocations.map((c, i) => (
+                    <li key={i}>
+                      <span className="coll-phrase">{c.phrase}</span>
+                      <span className="coll-zh">{c.zh}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {profileTab === 'rel' && (
+                <ul className="profile-coll">
+                  {profile.related.map((r, i) => (
+                    <li key={i}>
+                      <span className="coll-phrase">{r.word}</span>
+                      <span className="coll-zh">{r.zh}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {profileTab === 'forms' &&
+                (profile.forms.length === 0 ? (
+                  <p className="stub-note">这个词没有常见词形变化。</p>
+                ) : (
+                  <ul className="profile-coll">
+                    {profile.forms.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="section-note">
+              让 AI 生成完整词条：基本释义与用法、3 个例句（可朗读）、常用搭配、相关词、词形变化。
+            </p>
+            <button className="btn" disabled={profileBusy} onClick={() => void generateProfile()}>
+              {profileBusy ? '生成中…' : '生成 AI 释义与用法'}
+            </button>
+            {profileError && (
+              <p className="status-line status-err">
+                {profileError}
+                {/配置/.test(profileError) && '（设置 → AI 配置）'}
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -186,19 +350,21 @@ export default function WordDetail(): React.JSX.Element {
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3 className="card-h3">学习历史</h3>
-        {word.records.length === 0 ? (
+        {word.records.filter((r) => r.kind !== 'ai_profile').length === 0 ? (
           <p className="stub-note">还没有练习记录。从「今日学习 → 单词学习」开始，或通过长难句练习产生记录。</p>
         ) : (
           <ul className="record-list">
-            {word.records.map((r) => (
-              <li key={r.id}>
-                <span className="record-kind">长难句练习</span>
-                <span className="record-time">{r.occurredAt.slice(0, 10)}</span>
-                <p className="record-payload">
-                  {(r.payload as { sentence?: string }).sentence ?? JSON.stringify(r.payload).slice(0, 120)}
-                </p>
-              </li>
-            ))}
+            {word.records
+              .filter((r) => r.kind !== 'ai_profile')
+              .map((r) => (
+                <li key={r.id}>
+                  <span className="record-kind">{r.kind === 'translation' ? '长难句练习' : r.kind === 'ai_grade' ? '造句批改' : r.kind === 'ai_explain' ? 'AI 讲解' : r.kind}</span>
+                  <span className="record-time">{r.occurredAt.slice(0, 10)}</span>
+                  <p className="record-payload">
+                    {(r.payload as { sentence?: string }).sentence ?? JSON.stringify(r.payload).slice(0, 120)}
+                  </p>
+                </li>
+              ))}
           </ul>
         )}
       </div>

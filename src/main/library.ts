@@ -212,6 +212,12 @@ export function updateWord(id: number, patch: WordUpdatePatch): WordDetailData |
   if (patch.status !== undefined) {
     const s = Math.min(2, Math.max(0, patch.status))
     db.prepare('UPDATE words SET status = ? WHERE id = ?').run(s, id)
+    if (s === 2) {
+      // 手动标记已掌握：补时间戳，让统计「新掌握词」也算上
+      const d = new Date()
+      const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      db.prepare("UPDATE words SET mastered_at = ? WHERE id = ? AND mastered_at = ''").run(today, id)
+    }
   }
   return getWord(id)
 }

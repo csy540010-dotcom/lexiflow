@@ -141,6 +141,12 @@ function migrate(db: Database.Database): void {
   } catch {
     /* 已存在 */
   }
+  // 旧库补列：tracks.notes（听力笔记）
+  try {
+    db.exec("ALTER TABLE tracks ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+  } catch {
+    /* 已存在 */
+  }
 }
 
 export function dbFilePath(): string {

@@ -5,7 +5,9 @@ import { getDb } from './db'
 import { chatCompletion } from './ai'
 import { buildOrganizeTextPrompt, extractJsonObject } from './prompts'
 import { getAiConfig } from './settings'
-import type { TrackItem } from '../shared/types'
+import { lookupDictionary } from './dictionary'
+import { resolveBookId } from './study'
+import type { TrackItem, MusicWordItem } from '../shared/types'
 
 /* ── 音乐听力（MP3 + 文本导入 / AI 整理 / 播放） ─────────────── */
 
@@ -15,8 +17,11 @@ interface TrackRow {
   audio_file: string
   text_content: string
   segments: string
+  notes: string
   created_at: string
 }
+
+const TRACK_COLS = 'id, title, audio_file, text_content, segments, notes, created_at'
 
 export function musicDir(): string {
   const dir = path.join(app.getPath('userData'), 'music')
@@ -38,13 +43,14 @@ function mapTrack(r: TrackRow): TrackItem {
     audioFile: r.audio_file,
     textContent: r.text_content,
     segments,
+    notes: r.notes ?? '',
     createdAt: r.created_at
   }
 }
 
 export function listTracks(): TrackItem[] {
   const rows = getDb()
-    .prepare('SELECT id, title, audio_file, text_content, segments, created_at FROM tracks ORDER BY id DESC')
+    .prepare(`SELECT ${TRACK_COLS} FROM tracks ORDER BY id DESC`)
     .all() as unknown as TrackRow[]
   return rows.map(mapTrack)
 }
@@ -66,7 +72,7 @@ export function importAudioFromPath(srcPath: string): TrackItem {
     .prepare('INSERT INTO tracks (title, audio_file) VALUES (?, ?)')
     .run(title, name)
   const row = getDb()
-    .prepare('SELECT id, title, audio_file, text_content, segments, created_at FROM tracks WHERE id = ?')
+    .prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`)
     .get(Number(info.lastInsertRowid)) as unknown as TrackRow
   return mapTrack(row)
 }
@@ -74,11 +80,47 @@ export function importAudioFromPath(srcPath: string): TrackItem {
 export function setTrackText(id: number, text: string): TrackItem {
   const db = getDb()
   db.prepare('UPDATE tracks SET text_content = ?, segments = ? WHERE id = ?').run(String(text ?? ''), '[]', Number(id))
-  const row = db.prepare('SELECT id, title, audio_file, text_content, segments, created_at FROM tracks WHERE id = ?').get(Number(id)) as
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
     | TrackRow
     | undefined
   if (!row) throw new Error('听力条目不存在。')
   return mapTrack(row)
+}
+
+export function setTrackNotes(id: number, notes: string): TrackItem {
+  const db = getDb()
+  db.prepare('UPDATE tracks SET notes = ? WHERE id = ?').run(String(notes ?? ''), Number(id))
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
+    | TrackRow
+    | undefined
+  if (!row) throw new Error('听力条目不存在。')
+  return mapTrack(row)
+}
+
+/** 从听力文本里析出词典收录的单词（生词标签用；按首次出现排序）。 */
+export function extractWordsFromTrack(id: number): MusicWordItem[] {
+  const db = getDb()
+  const row = db.prepare('SELECT text_content FROM tracks WHERE id = ?').get(Number(id)) as
+    | { text_content: string }
+    | undefined
+  if (!row) throw new Error('听力条目不存在。')
+  const bookId = resolveBookId()
+  const seen = new Set<string>()
+  const out: MusicWordItem[] = []
+  const matches = row.text_content.toLowerCase().matchAll(/[a-z][a-z'-]{2,}/g)
+  for (const m of matches) {
+    const w = m[0].replace(/^['-]+|['-]+$/g, '')
+    if (!w || seen.has(w)) continue
+    seen.add(w)
+    const entry = lookupDictionary(w)
+    if (!entry?.meaning) continue
+    const inBook = Boolean(
+      db.prepare('SELECT id FROM words WHERE book_id = ? AND lower(headword) = ?').get(bookId, w)
+    )
+    out.push({ word: w, phonetic: entry.phonetic, meaning: entry.meaning, inBook })
+    if (out.length >= 150) break
+  }
+  return out
 }
 
 export function deleteTrack(id: number): TrackItem[] {
@@ -98,7 +140,7 @@ export function deleteTrack(id: number): TrackItem[] {
 /** AI 整理原文：清理格式、分段分句（时间轴对齐留后续版本）。 */
 export async function organizeTrack(id: number): Promise<TrackItem> {
   const db = getDb()
-  const row = db.prepare('SELECT id, title, audio_file, text_content, segments, created_at FROM tracks WHERE id = ?').get(Number(id)) as
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
     | TrackRow
     | undefined
   if (!row) throw new Error('听力条目不存在。')
@@ -121,7 +163,7 @@ export async function organizeTrack(id: number): Promise<TrackItem> {
   }
   if (segments.length === 0) throw new Error('AI 返回格式异常，请重试一次。')
   db.prepare('UPDATE tracks SET segments = ? WHERE id = ?').run(JSON.stringify(segments), Number(id))
-  const updated = db.prepare('SELECT id, title, audio_file, text_content, segments, created_at FROM tracks WHERE id = ?').get(Number(id)) as unknown as TrackRow
+  const updated = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as unknown as TrackRow
   return mapTrack(updated)
 }
 

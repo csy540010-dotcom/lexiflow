@@ -111,6 +111,25 @@ export function buildTranslatePrompt(text: string): string {
   ].join('\n')
 }
 
+/** 单词详情增强：结构化学习资料（释义与用法 / 例句 / 搭配 / 相关词 / 词形变化）。 */
+export function buildWordProfilePrompt(word: string, phonetic: string, meaning: string): string {
+  return [
+    '你是面向中国学习者的英语老师。为单词「' + word + '」生成一份结构化学习资料。',
+    phonetic ? '音标：' + phonetic : '',
+    meaning ? '词典释义：' + meaning : '',
+    '只输出一个 JSON 对象（不要代码块、不要任何其他文字）：',
+    '{"definitions":["中文释义1（含词性和使用场景说明）","中文释义2（可选）"],' +
+      '"examples":[{"en":"地道英文例句","zh":"中文翻译"}],' +
+      '"collocations":[{"phrase":"常见搭配","zh":"中文说明"}],' +
+      '"related":[{"word":"相关词（同根词/近义词/反义词）","zh":"词性与中文"}],' +
+      '"forms":["词形变化，例如 wonderfully adv. 美妙地（无变化则为空数组）"]}',
+    '数量要求：definitions 1-3 条、examples 3 条、collocations 3-5 条、related 3-5 条、forms 0-4 条。',
+    '例句难度参考四六级，内容真实自然，不要出现 "as an example" 这类元话语。'
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 export interface GradeResult {
   scores: GradeScores
   revised: string

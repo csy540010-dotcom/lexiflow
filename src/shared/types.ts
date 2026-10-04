@@ -251,7 +251,25 @@ export interface TrackItem {
   audioFile: string
   textContent: string
   segments: string[]
+  notes: string
   createdAt: string
+}
+
+/* ── 单词详情增强（M6.5） ─────────────── */
+
+export interface WordProfile {
+  definitions: string[]
+  examples: Array<{ en: string; zh: string }>
+  collocations: Array<{ phrase: string; zh: string }>
+  related: Array<{ word: string; zh: string }>
+  forms: string[]
+}
+
+export interface MusicWordItem {
+  word: string
+  phonetic: string
+  meaning: string
+  inBook: boolean
 }
 
 export interface ExplainResult {

@@ -38,6 +38,8 @@ import {
   listTracks,
   importAudioFromPath,
   setTrackText,
+  setTrackNotes,
+  extractWordsFromTrack,
   deleteTrack,
   organizeTrack,
   listeningTick,
@@ -54,6 +56,7 @@ import {
   todayQueue,
   explainWord,
   generatePrompts,
+  generateWordProfile,
   gradeSentence,
   selectBook,
   selectedBookId,
@@ -203,6 +206,7 @@ app.whenReady().then(() => {
   ipcMain.handle('study:selectedBook', () => selectedBookId())
   ipcMain.handle('study:explain', (_e, wordId: number) => explainWord(Number(wordId)))
   ipcMain.handle('study:genPrompts', (_e, wordId: number) => generatePrompts(Number(wordId)))
+  ipcMain.handle('study:profile', (_e, wordId: number) => generateWordProfile(Number(wordId)))
   ipcMain.handle('study:submit', (_e, wordId: number, sentence: string) => gradeSentence(Number(wordId), String(sentence ?? '')))
   ipcMain.handle('tasks:list', () => listTasks())
   ipcMain.handle('tasks:add', (_e, kind: string, title: string, target: string) => addTask(String(kind ?? 'custom'), String(title ?? ''), String(target ?? '')))
@@ -269,6 +273,8 @@ app.whenReady().then(() => {
     return importAudioFromPath(result.filePaths[0])
   })
   ipcMain.handle('music:setText', (_e, id: number, text: string) => setTrackText(Number(id), String(text ?? '')))
+  ipcMain.handle('music:setNotes', (_e, id: number, notes: string) => setTrackNotes(Number(id), String(notes ?? '')))
+  ipcMain.handle('music:words', (_e, id: number) => extractWordsFromTrack(Number(id)))
   ipcMain.handle('music:delete', (_e, id: number) => deleteTrack(Number(id)))
   ipcMain.handle('music:organize', (_e, id: number) => organizeTrack(Number(id)))
   ipcMain.handle('music:tick', (_e, seconds: number) => listeningTick(Number(seconds)))
@@ -305,6 +311,7 @@ app.whenReady().then(() => {
         queue: todayQueue,
         selectBook,
         genPrompts: generatePrompts,
+        profile: generateWordProfile,
         tasks: { list: listTasks, add: addTask, toggle: toggleTask, remove: removeTask },
         favs: { list: listFavorites, add: addFavorite, remove: removeFavorite }
       },
@@ -335,6 +342,8 @@ app.whenReady().then(() => {
         list: listTracks,
         importFromPath: importAudioFromPath,
         setText: setTrackText,
+        setNotes: setTrackNotes,
+        words: extractWordsFromTrack,
         remove: deleteTrack,
         tick: listeningTick,
         untick: unlisteningTick

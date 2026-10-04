@@ -579,6 +579,171 @@ body {
   line-height: 1.9;
 }
 
+/* ── 单词详情增强（发音 / AI 词条标签） ─────────── */
+.speak-btn {
+  background: rgba(66, 119, 101, 0.1);
+  border: 0;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.speak-btn:hover {
+  background: rgba(66, 119, 101, 0.2);
+}
+
+.speak-inline {
+  margin-left: 8px;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.profile-body {
+  margin-top: 12px;
+}
+
+.profile-defs {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 14px;
+  line-height: 2.1;
+}
+
+.profile-defs li {
+  margin-bottom: 6px;
+}
+
+.profile-examples {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-examples li {
+  border: 1px solid var(--lf-line);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.example-en {
+  margin: 0 0 4px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.example-zh {
+  margin: 0;
+  font-size: 13px;
+  color: var(--lf-muted);
+  line-height: 1.8;
+}
+
+.profile-coll {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-coll li {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 6px 2px;
+  border-bottom: 1px dashed var(--lf-line);
+  font-size: 14px;
+}
+
+.profile-coll li:last-child {
+  border-bottom: 0;
+}
+
+.coll-phrase {
+  font-weight: 600;
+  font-family: Georgia, 'Times New Roman', serif;
+  min-width: 120px;
+}
+
+.coll-zh {
+  color: var(--lf-muted);
+  font-size: 13px;
+}
+
+/* ── 播放器头部（封面） ─────────── */
+.player-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.cover-tile {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #427765, #2f5a4b);
+  color: #fff;
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(47, 90, 75, 0.25);
+}
+
+.player-head-main {
+  min-width: 0;
+}
+
+.player-head-main .player-title {
+  margin: 0 0 4px;
+}
+
+.music-word-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.music-word-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--lf-line);
+}
+
+.music-word-row:last-child {
+  border-bottom: 0;
+}
+
+.music-word-main {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.music-word-phonetic {
+  font-size: 12px;
+  color: var(--lf-muted);
+}
+
 .mastery-grid {
   display: flex;
   flex-direction: column;

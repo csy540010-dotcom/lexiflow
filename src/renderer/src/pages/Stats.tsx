@@ -142,6 +142,22 @@ export default function Stats(): React.JSX.Element {
         </div>
 
         <div className="card stat-card">
+          <h3 className="card-h3">阅读量</h3>
+          <p className="stat-big">{summary.readingChars > 0 ? (summary.readingChars >= 10000 ? (summary.readingChars / 10000).toFixed(1) + ' 万' : summary.readingChars) : '—'}</p>
+          <p className="stub-note">
+            {summary.readingArticles > 0 ? `${summary.readingArticles} 篇文章的阅读记录` : '还没有阅读记录，去「阅读」导入一篇文章'}
+          </p>
+        </div>
+
+        <div className="card stat-card">
+          <h3 className="card-h3">听力时间</h3>
+          <p className="stat-big">
+            {summary.listeningMinutes}<span className="stat-unit"> 分钟</span>
+          </p>
+          <p className="stub-note">播放器播放时自动累计</p>
+        </div>
+
+        <div className="card stat-card">
           <h3 className="card-h3">高频错误词</h3>
           {summary.topMistakes.length === 0 ? (
             <p className="stub-note">范围内还没有批改出错的记录——保持！</p>
@@ -160,7 +176,7 @@ export default function Stats(): React.JSX.Element {
 
       <div className="card" style={{ marginTop: 16 }}>
         <p className="section-note">
-          听力时间、阅读量、写作量将在「阅读」「音乐听力」模块（M6）上线后自动计入。目前自定义任务的打卡次数已在上方统计。
+          写作量按「今日学习 → 我的任务」里的写作打卡次数统计（见上方「任务打卡」卡片）。
         </p>
       </div>
     </section>

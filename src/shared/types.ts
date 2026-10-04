@@ -217,6 +217,39 @@ export interface StatsSummary {
   topMistakes: Array<{ word: string; count: number }>
   tasksDone: Array<{ kind: string; count: number }>
   mastery: { unlearned: number; learning: number; mastered: number }
+  readingArticles: number
+  readingChars: number
+  listeningMinutes: number
+}
+
+/* ── 阅读 + 音乐听力（M6） ─────────────── */
+
+export interface ArticleItem {
+  id: number
+  title: string
+  content: string
+  source: string
+  createdAt: string
+  lastReadAt: string
+  chars: number
+}
+
+export interface DictLookup {
+  word: string
+  found: boolean
+  phonetic: string
+  meaning: string
+  inBook: boolean
+  wordId?: number
+}
+
+export interface TrackItem {
+  id: number
+  title: string
+  audioFile: string
+  textContent: string
+  segments: string[]
+  createdAt: string
 }
 
 export interface ExplainResult {

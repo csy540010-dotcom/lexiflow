@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { getDb } from './db'
 import type {
   AppSettings,
   SettingsPatch,
@@ -89,10 +90,30 @@ export interface SelfTestHooks {
       topMistakes: Array<{ word: string; count: number }>
       tasksDone: Array<{ kind: string; count: number }>
       mastery: { unlearned: number; learning: number; mastered: number }
+      readingArticles: number
+      readingChars: number
+      listeningMinutes: number
     }
     seed: () => { wordId: number }
     cleanup: () => void
     cleanupReviewEvents: (wordIds: number[]) => void
+    cleanupReading: (articleId: number) => void
+  }
+  reading: {
+    list: () => Array<{ id: number; title: string; content: string; chars: number }>
+    create: (title: string, content: string, source: string) => { id: number; title: string; chars: number }
+    delete: (id: number) => void
+    log: (id: number) => void
+    lookup: (word: string) => { word: string; found: boolean; phonetic: string; meaning: string; inBook: boolean; wordId?: number }
+    addWord: (headword: string) => { word: { id: number } | null; added: boolean }
+  }
+  music: {
+    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[] }>
+    importFromPath: (srcPath: string) => { id: number; title: string; audioFile: string }
+    setText: (id: number, text: string) => { id: number; textContent: string }
+    remove: (id: number) => Array<{ id: number }>
+    tick: (seconds: number) => void
+    untick: (seconds: number) => void
   }
   mastery: MasteryHooks
 }
@@ -328,6 +349,54 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
       '统计：seed 数据已清理'
     )
 
+    // 9.96 阅读：导入 → 查词 → 入词库 → 阅读量 → 删除（连带清理）
+    const baselineM6 = hooks.stats.summary(7)
+    const article = hooks.reading.create(
+      'M6 自检文章',
+      'The road ended abruptly. A curious cat watched the rain.',
+      'paste'
+    )
+    assert(article.id > 0 && article.chars > 20, `阅读：导入文章（${article.chars} 字符）`)
+    assert(hooks.reading.list().some((a) => a.id === article.id), '阅读：列表包含新文章')
+    const lookup = hooks.reading.lookup('abruptly')
+    assert(lookup.found && lookup.phonetic.startsWith('/') && lookup.meaning.length > 0, `阅读：点词查义（abruptly ${lookup.phonetic}）`)
+    assert(hooks.reading.lookup('curious').found, '阅读：点词查义（curious）')
+    const existed = hooks.reading.addWord('abruptly')
+    assert(!existed.added && !!existed.word, '阅读：已在词库的词不重复添加')
+    const created = hooks.reading.addWord('zqxselftestword')
+    assert(created.added && !!created.word, '阅读：生词加入词库')
+    getDb().prepare("DELETE FROM words WHERE headword = 'zqxselftestword'").run()
+    hooks.reading.log(article.id)
+    const withReading = hooks.stats.summary(7)
+    assert(
+      withReading.readingChars === baselineM6.readingChars + article.chars &&
+        withReading.readingArticles >= baselineM6.readingArticles + 1,
+      `阅读：阅读量 +${article.chars} 字符`
+    )
+    hooks.reading.delete(article.id)
+    const afterDelete = hooks.stats.summary(7)
+    assert(
+      afterDelete.readingChars === baselineM6.readingChars && !hooks.reading.list().some((a) => a.id === article.id),
+      '阅读：删除文章（统计同步回退）'
+    )
+
+    // 9.97 音乐听力：导入音频 → 听力时间 → 删除（连带删除副本）
+    const audioSrc = path.join(selftestDir, 'm6-audio.mp3')
+    fs.mkdirSync(selftestDir, { recursive: true })
+    fs.writeFileSync(audioSrc, Buffer.concat([Buffer.from('ID3'), Buffer.alloc(2048)]))
+    const track = hooks.music.importFromPath(audioSrc)
+    assert(track.id > 0 && track.audioFile.length > 0, `听力：导入音频（${track.audioFile}）`)
+    assert(hooks.music.list().some((t) => t.id === track.id), '听力：列表包含新音频')
+    hooks.music.setText(track.id, 'First line of the transcript.\n\nSecond line.')
+    assert(hooks.music.list().find((t) => t.id === track.id)?.textContent.length > 0, '听力：文本已保存')
+    hooks.music.tick(60)
+    const withListen = hooks.stats.summary(7)
+    assert(withListen.listeningMinutes === baselineM6.listeningMinutes + 1, `听力：听力时间 +1 分钟（${baselineM6.listeningMinutes} → ${withListen.listeningMinutes}）`)
+    hooks.music.untick(60)
+    assert(hooks.stats.summary(7).listeningMinutes === baselineM6.listeningMinutes, '听力：听力时间已回退')
+    hooks.music.remove(track.id)
+    assert(!hooks.music.list().some((t) => t.id === track.id), '听力：删除条目（音频副本同步删除）')
+
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })
     await new Promise((r) => setTimeout(r, 500))
@@ -374,6 +443,18 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     const statsText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
     assert(/统计分析|学习时长|练习准确率|高频错误词/.test(statsText), '统计页渲染出内容（DOM 文本断言）')
     fs.writeFileSync(path.join(selftestDir, 'm5-stats.png'), (await win.webContents.capturePage()).toPNG())
+
+    // 13. 截图：阅读 + 音乐听力
+    await win.webContents.executeJavaScript("location.hash = '#/reading'")
+    await new Promise((r) => setTimeout(r, 900))
+    const readingText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/阅读|粘贴文章|导入文件/.test(readingText), '阅读页渲染出内容（DOM 文本断言）')
+    fs.writeFileSync(path.join(selftestDir, 'm6-reading.png'), (await win.webContents.capturePage()).toPNG())
+    await win.webContents.executeJavaScript("location.hash = '#/music'")
+    await new Promise((r) => setTimeout(r, 900))
+    const musicText = (await win.webContents.executeJavaScript('document.body.innerText')) as string
+    assert(/音乐听力|导入 MP3/.test(musicText), '听力页渲染出内容（DOM 文本断言）')
+    fs.writeFileSync(path.join(selftestDir, 'm6-music.png'), (await win.webContents.capturePage()).toPNG())
     console.log('[lexiflow] selftest screenshots saved')
 
     console.log('[lexiflow] selftest OK')

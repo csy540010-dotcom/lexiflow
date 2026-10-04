@@ -87,6 +87,20 @@ export function buildSentenceTaskPrompt(word: string, meaning: string, type: 'tr
   ].join('\n')
 }
 
+/** 听力原文整理（音乐听力）：清理、分段、分句。 */
+export function buildOrganizeTextPrompt(title: string, text: string): string {
+  return [
+    '把下面的英语听力材料原文整理成适合跟读和对照的分段文本。',
+    '要求：去掉时间戳、页码、字幕编号、广告等杂质；按语义分段；保留原英文，不要翻译、不要改写、不要增删内容。',
+    '只输出一个 JSON 数组，每个元素是一段整理后的文本：["段1","段2",...]',
+    title ? '材料标题：' + title : '',
+    '原文：',
+    text.slice(0, 8000)
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 export interface GradeResult {
   scores: GradeScores
   revised: string

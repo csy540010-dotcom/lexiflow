@@ -1,11 +1,295 @@
-import PageStub from '../components/PageStub'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { TrackItem } from '../../../shared/types'
+
+function fmtTime(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) return '00:00'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
+}
+
+const SPEEDS = [0.75, 1.0, 1.25, 1.5]
 
 export default function Music(): React.JSX.Element {
+  const [tracks, setTracks] = useState<TrackItem[]>([])
+  const [selected, setSelected] = useState<TrackItem | null>(null)
+  const [tab, setTab] = useState<'raw' | 'organized'>('raw')
+  const [textDraft, setTextDraft] = useState('')
+  const [playing, setPlaying] = useState(false)
+  const [current, setCurrent] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [speed, setSpeed] = useState(1.0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const tickRef = useRef<number | null>(null)
+
+  const reload = useCallback(async (): Promise<TrackItem[]> => {
+    const list = await window.lexi.listTracks()
+    setTracks(list)
+    return list
+  }, [])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
+
+  function flash(msg: string): void {
+    setToast(msg)
+    window.setTimeout(() => setToast(''), 2200)
+  }
+
+  // 播放中每 5 秒累计听力时间
+  useEffect(() => {
+    if (playing) {
+      tickRef.current = window.setInterval(() => void window.lexi.listeningTick(5), 5000)
+    } else if (tickRef.current) {
+      window.clearInterval(tickRef.current)
+      tickRef.current = null
+    }
+    return () => {
+      if (tickRef.current) window.clearInterval(tickRef.current)
+    }
+  }, [playing])
+
+  async function importAudio(): Promise<void> {
+    const track = await window.lexi.importAudio()
+    if (!track) return
+    await reload()
+    void selectTrack(track)
+    flash('音频已导入（原文件未改动）')
+  }
+
+  function selectTrack(track: TrackItem): void {
+    setSelected(track)
+    setTextDraft(track.textContent)
+    setTab(track.segments.length > 0 ? 'organized' : 'raw')
+    setError('')
+    setPlaying(false)
+    setCurrent(0)
+    setDuration(0)
+  }
+
+  async function removeTrack(track: TrackItem): Promise<void> {
+    if (!window.confirm(`删除听力条目「${track.title}」？（App 内副本会删除，你的原文件不受影响）`)) return
+    const list = await window.lexi.deleteTrack(track.id)
+    setTracks(list)
+    if (selected?.id === track.id) setSelected(null)
+  }
+
+  async function saveText(): Promise<void> {
+    if (!selected) return
+    const updated = await window.lexi.setText(selected.id, textDraft)
+    setSelected(updated)
+    flash('文本已保存')
+  }
+
+  async function organize(): Promise<void> {
+    if (!selected) return
+    setBusy(true)
+    setError('')
+    try {
+      if (textDraft !== selected.textContent) {
+        const saved = await window.lexi.setText(selected.id, textDraft)
+        setSelected(saved)
+      }
+      const updated = await window.lexi.organizeTrack(selected.id)
+      setSelected(updated)
+      setTab('organized')
+      flash('AI 整理完成')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function togglePlay(): void {
+    const el = audioRef.current
+    if (!el) return
+    if (playing) {
+      el.pause()
+    } else {
+      void el.play()
+    }
+  }
+
+  function seek(sec: number): void {
+    const el = audioRef.current
+    if (!el) return
+    el.currentTime = Math.max(0, Math.min(el.duration || 0, sec))
+  }
+
+  function changeSpeed(v: number): void {
+    setSpeed(v)
+    if (audioRef.current) audioRef.current.playbackRate = v
+  }
+
+  /* ── 播放器详情 ─────────────────────── */
+  if (selected) {
+    const src = 'lexi-media://music/' + encodeURIComponent(selected.audioFile)
+    return (
+      <section>
+        <div className="detail-topbar">
+          <button className="text-btn" onClick={() => { setSelected(null); setPlaying(false) }}>
+            ← 返回听力库
+          </button>
+          <span className="session-progress">{playing ? '播放中 · 计入听力时间' : '已暂停'}</span>
+        </div>
+
+        <div className="card player-card">
+          <h3 className="player-title">{selected.title}</h3>
+          <audio
+            ref={audioRef}
+            src={src}
+            preload="metadata"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => {
+              setDuration(e.currentTarget.duration || 0)
+              e.currentTarget.playbackRate = speed
+            }}
+            onError={() => setError('音频加载失败，请删除后重新导入。')}
+          />
+
+          <div className="player-progress">
+            <span className="player-time">{fmtTime(current)}</span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, duration)}
+              step={1}
+              value={Math.min(current, duration)}
+              onChange={(e) => seek(Number(e.target.value))}
+            />
+            <span className="player-time">{fmtTime(duration)}</span>
+          </div>
+
+          <div className="player-controls">
+            <button className="btn btn-ghost btn-sm" onClick={() => seek(current - 10)}>
+              ↶ 10s
+            </button>
+            <button className="btn player-play" onClick={togglePlay}>
+              {playing ? '⏸ 暂停' : '▶ 播放'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => seek(current + 10)}>
+              10s ↷
+            </button>
+            <select value={speed} onChange={(e) => changeSpeed(Number(e.target.value))} className="speed-select">
+              {SPEEDS.map((s) => (
+                <option key={s} value={s}>
+                  {s.toFixed(2).replace(/0$/, '')}x
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="card module-card" style={{ marginTop: 16 }}>
+          <div className="card-head-row">
+            <div className="chips" style={{ margin: 0 }}>
+              <button className={'chip' + (tab === 'raw' ? ' chip-active' : '')} onClick={() => setTab('raw')}>
+                原文
+              </button>
+              <button className={'chip' + (tab === 'organized' ? ' chip-active' : '')} onClick={() => setTab('organized')}>
+                AI 整理{selected.segments.length > 0 ? `（${selected.segments.length} 段）` : ''}
+              </button>
+            </div>
+            <button className="btn btn-sm" disabled={busy || !textDraft.trim()} onClick={() => void organize()}>
+              {busy ? '整理中…' : 'AI 整理文本'}
+            </button>
+          </div>
+
+          {tab === 'raw' ? (
+            <>
+              <p className="section-note">粘贴或修改对应文本，再点「AI 整理文本」清理格式、分段分句。</p>
+              <textarea
+                className="notes-area"
+                style={{ minHeight: 180 }}
+                value={textDraft}
+                onChange={(e) => setTextDraft(e.target.value)}
+                placeholder="把这段音频的原文粘贴到这里（也可以只放字幕文本）…"
+              />
+              <div className="btn-row">
+                <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void saveText()}>
+                  保存文本
+                </button>
+              </div>
+            </>
+          ) : selected.segments.length === 0 ? (
+            <p className="stub-note">还没有整理结果。先切到「原文」贴上文本，再点右上角「AI 整理文本」。</p>
+          ) : (
+            <ol className="segment-list">
+              {selected.segments.map((seg, i) => (
+                <li key={i} className="segment-item">
+                  <span className="segment-index">{i + 1}</span>
+                  <p>{seg}</p>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {error && (
+            <p className="status-line status-err">
+              {error}
+              {/配置/.test(error) && '（设置 → AI 配置）'}
+            </p>
+          )}
+        </div>
+
+        {toast && <div className="toast">{toast}</div>}
+      </section>
+    )
+  }
+
+  /* ── 听力库列表 ─────────────────────── */
   return (
-    <PageStub
-      title="音乐听力"
-      subtitle="面向英语学习的音乐 / 播客播放器"
-      planned="规划中的模块：导入 MP3 + 对应文本 · AI 整理文本（分段分句、生词、长难句）· 播放器（M6 实现）"
-    />
+    <section>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">音乐听力</h1>
+          <p className="page-sub">面向英语学习的音乐 / 播客播放器——导入 MP3 + 对应文本</p>
+        </div>
+        <button className="btn" onClick={() => void importAudio()}>
+          导入 MP3
+        </button>
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        {tracks.length === 0 ? (
+          <p className="stub-note">
+            听力库还是空的。点右上角「导入 MP3」选一个音频文件（App 会复制一份副本，你的原文件不动），再粘贴对应文本让 AI 整理。
+          </p>
+        ) : (
+          <div className="article-list">
+            {tracks.map((t) => (
+              <div key={t.id} className="article-row" onClick={() => selectTrack(t)}>
+                <div className="article-row-main">
+                  <span className="article-row-title">♫ {t.title}</span>
+                  <span className="article-row-meta">
+                    {t.textContent ? '有文本' : '缺文本'}
+                    {t.segments.length > 0 ? ` · AI 整理 ${t.segments.length} 段` : ''} · {t.createdAt.slice(0, 10)}
+                  </span>
+                </div>
+                <button
+                  className="text-btn task-remove"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void removeTrack(t)
+                  }}
+                >
+                  删除
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {toast && <div className="toast">{toast}</div>}
+    </section>
   )
 }

@@ -104,6 +104,29 @@ function migrate(db: Database.Database): void {
       date TEXT PRIMARY KEY,
       seconds INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS articles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'paste',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_read_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS tracks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      audio_file TEXT NOT NULL,
+      text_content TEXT NOT NULL DEFAULT '',
+      segments TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS listening_time (
+      date TEXT PRIMARY KEY,
+      seconds INTEGER NOT NULL DEFAULT 0
+    );
   `)
   // 旧库补列：mastered_at（M5 新掌握词统计用；新库在 CREATE TABLE 里自带）
   try {

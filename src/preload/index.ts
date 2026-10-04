@@ -20,7 +20,10 @@ import type {
   PracticeType,
   McqResponse,
   PracticePoolItem,
-  StatsSummary
+  StatsSummary,
+  ArticleItem,
+  DictLookup,
+  TrackItem
 } from '../shared/types'
 
 const api = {
@@ -81,7 +84,24 @@ const api = {
     ipcRenderer.invoke('practice:record', type, payload),
 
   statsSummary: (days: number | null): Promise<StatsSummary> => ipcRenderer.invoke('stats:summary', days),
-  statsTick: (seconds: number): Promise<void> => ipcRenderer.invoke('stats:tick', seconds)
+  statsTick: (seconds: number): Promise<void> => ipcRenderer.invoke('stats:tick', seconds),
+
+  listArticles: (): Promise<ArticleItem[]> => ipcRenderer.invoke('reading:list'),
+  createArticle: (title: string, content: string, source: string): Promise<ArticleItem> =>
+    ipcRenderer.invoke('reading:create', title, content, source),
+  deleteArticle: (id: number): Promise<void> => ipcRenderer.invoke('reading:delete', id),
+  logReading: (id: number): Promise<void> => ipcRenderer.invoke('reading:log', id),
+  lookupWord: (word: string): Promise<DictLookup> => ipcRenderer.invoke('reading:lookup', word),
+  addWordToBook: (headword: string): Promise<{ word: WordDetailData | null; added: boolean }> =>
+    ipcRenderer.invoke('reading:addWord', headword),
+  importArticleFile: (): Promise<ArticleItem | null> => ipcRenderer.invoke('reading:importFile'),
+
+  listTracks: (): Promise<TrackItem[]> => ipcRenderer.invoke('music:list'),
+  importAudio: (): Promise<TrackItem | null> => ipcRenderer.invoke('music:import'),
+  setTrackText: (id: number, text: string): Promise<TrackItem> => ipcRenderer.invoke('music:setText', id, text),
+  deleteTrack: (id: number): Promise<TrackItem[]> => ipcRenderer.invoke('music:delete', id),
+  organizeTrack: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:organize', id),
+  listeningTick: (seconds: number): Promise<void> => ipcRenderer.invoke('music:tick', seconds)
 }
 
 export type LexiApi = typeof api

@@ -134,6 +134,31 @@ export function statsSummary(days: number | null): StatsSummary {
     else mastery.unlearned = Number(row.n)
   }
 
+  // 阅读量（打开文章产生 reading 事件）
+  const readingRows = since
+    ? (db
+        .prepare(
+          "SELECT json_extract(payload, '$.articleId') AS aid, json_extract(payload, '$.chars') AS chars FROM study_events WHERE kind = 'reading' AND json_extract(payload, '$.date') >= ?"
+        )
+        .all(since) as unknown as Array<{ aid: number; chars: number }>)
+    : (db
+        .prepare(
+          "SELECT json_extract(payload, '$.articleId') AS aid, json_extract(payload, '$.chars') AS chars FROM study_events WHERE kind = 'reading'"
+        )
+        .all() as unknown as Array<{ aid: number; chars: number }>)
+  const readingArticleSet = new Set<number>()
+  let readingChars = 0
+  for (const row of readingRows) {
+    if (row.aid != null) readingArticleSet.add(Number(row.aid))
+    readingChars += Number(row.chars ?? 0)
+  }
+
+  // 听力时间
+  const listenRow = since
+    ? (db.prepare('SELECT COALESCE(SUM(seconds),0) AS s FROM listening_time WHERE date >= ?').get(since) as { s: number })
+    : (db.prepare('SELECT COALESCE(SUM(seconds),0) AS s FROM listening_time').get() as { s: number })
+  const listeningMinutes = Math.round(Number(listenRow.s) / 60)
+
   return {
     studyMinutes,
     newMastered,
@@ -145,7 +170,10 @@ export function statsSummary(days: number | null): StatsSummary {
     reviewTaped,
     topMistakes,
     tasksDone,
-    mastery
+    mastery,
+    readingArticles: readingArticleSet.size,
+    readingChars,
+    listeningMinutes
   }
 }
 
@@ -207,6 +235,13 @@ export function cleanupStats(): void {
     db.prepare('UPDATE study_time SET seconds = MAX(0, seconds - 120) WHERE date = ?').run(localDate())
     kvSet(SEED_FLAG, '')
   }
+}
+
+/** 自检用：回退一段阅读量事件（按 articleId）。 */
+export function cleanupReadingEvents(articleId: number): void {
+  getDb()
+    .prepare("DELETE FROM study_events WHERE kind = 'reading' AND json_extract(payload, '$.articleId') = ?")
+    .run(Number(articleId))
 }
 
 /** 清理自检复习断言产生的真实事件（按 wordId 删除）。 */

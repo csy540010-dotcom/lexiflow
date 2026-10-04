@@ -228,7 +228,7 @@ export default function StudySession(): React.JSX.Element {
           <div className="card module-card" style={{ marginTop: 16 }}>
             <h3 className="card-h3">句子练习</h3>
             <p className="section-note">用「{word.headword}」写一个句子或短段落，AI 会从四个维度给反馈。</p>
-            {word.prompts.length > 0 && (
+            {word.prompts.length > 0 ? (
               <p className="prompt-hint">
                 💡 造句提示：{word.prompts[promptIdx % word.prompts.length]}
                 {word.prompts.length > 1 && (
@@ -237,6 +237,8 @@ export default function StudySession(): React.JSX.Element {
                   </button>
                 )}
               </p>
+            ) : (
+              <p className="prompt-hint">该词暂无内置造句提示，直接写一个试试——可以参考 AI 讲解里的例句和搭配。</p>
             )}
             <textarea
               className="notes-area"

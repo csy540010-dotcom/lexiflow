@@ -111,6 +111,10 @@ function writeFixture(dir: string): void {
 
 export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Promise<void> {
   try {
+    // 0. 快照用户真实配置——自检绝不能破坏用户已保存的 Key 和设置
+    const snap = hooks.loadSettings()
+    const snapKey = hooks.storedKey()
+
     // 1. 设置读写回环
     hooks.saveSettingsPatch({ plan: { dailyNew: 25 }, appearance: { theme: 'dark' } })
     let s = hooks.loadSettings()
@@ -127,11 +131,21 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     const bad = await hooks.testAi({ preset: 'custom', baseUrl: '', model: '' })
     assert(!bad.ok && /补全/.test(bad.error ?? ''), '未配置时测试连接返回引导文案')
 
-    // 4. 恢复默认，避免自检数据残留
-    hooks.saveAiKey('')
-    hooks.saveSettingsPatch({ plan: { dailyNew: 20 }, appearance: { theme: 'light' } })
+    // 4. 恢复用户真实配置（Key 原样放回，设置原样写回）
+    hooks.saveAiKey(snapKey)
+    hooks.saveSettingsPatch({
+      ai: { preset: snap.ai.preset, baseUrl: snap.ai.baseUrl, model: snap.ai.model },
+      plan: snap.plan,
+      appearance: snap.appearance
+    })
     s = hooks.loadSettings()
-    assert(s.plan.dailyNew === 20 && !s.ai.hasKey, '自检数据已清理')
+    assert(hooks.storedKey() === snapKey, '用户 API Key 已原样恢复')
+    assert(
+      s.plan.dailyNew === snap.plan.dailyNew &&
+        s.appearance.theme === snap.appearance.theme &&
+        s.ai.baseUrl === snap.ai.baseUrl,
+      '用户设置已原样恢复'
+    )
 
     // 5. 内置词典与四六级书
     const books = hooks.library.listBooks()

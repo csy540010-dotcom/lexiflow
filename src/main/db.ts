@@ -120,6 +120,8 @@ function migrate(db: Database.Database): void {
       audio_file TEXT NOT NULL,
       text_content TEXT NOT NULL DEFAULT '',
       segments TEXT NOT NULL DEFAULT '[]',
+      notes TEXT NOT NULL DEFAULT '',
+      duration INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -144,6 +146,12 @@ function migrate(db: Database.Database): void {
   // 旧库补列：tracks.notes（听力笔记）
   try {
     db.exec("ALTER TABLE tracks ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+  } catch {
+    /* 已存在 */
+  }
+  // 旧库补列：tracks.duration（播放后记录时长，秒）
+  try {
+    db.exec('ALTER TABLE tracks ADD COLUMN duration INTEGER NOT NULL DEFAULT 0')
   } catch {
     /* 已存在 */
   }

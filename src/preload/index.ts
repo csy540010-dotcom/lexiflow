@@ -108,10 +108,19 @@ const api = {
   importAudio: (): Promise<TrackItem | null> => ipcRenderer.invoke('music:import'),
   setTrackText: (id: number, text: string): Promise<TrackItem> => ipcRenderer.invoke('music:setText', id, text),
   setTrackNotes: (id: number, notes: string): Promise<TrackItem> => ipcRenderer.invoke('music:setNotes', id, notes),
+  setTrackDuration: (id: number, seconds: number): Promise<TrackItem> =>
+    ipcRenderer.invoke('music:setDuration', id, seconds),
   extractTrackWords: (id: number): Promise<MusicWordItem[]> => ipcRenderer.invoke('music:words', id),
   deleteTrack: (id: number): Promise<TrackItem[]> => ipcRenderer.invoke('music:delete', id),
   organizeTrack: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:organize', id),
-  listeningTick: (seconds: number): Promise<void> => ipcRenderer.invoke('music:tick', seconds)
+  listeningTick: (seconds: number): Promise<void> => ipcRenderer.invoke('music:tick', seconds),
+  onOrganizeProgress: (cb: (p: { id: number; done: number; total: number }) => void): (() => void) => {
+    const listener = (_e: unknown, p: { id: number; done: number; total: number }): void => cb(p)
+    ipcRenderer.on('music:organize-progress', listener as never)
+    return () => {
+      ipcRenderer.removeListener('music:organize-progress', listener as never)
+    }
+  }
 }
 
 export type LexiApi = typeof api

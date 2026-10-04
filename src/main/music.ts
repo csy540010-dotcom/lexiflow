@@ -18,10 +18,11 @@ interface TrackRow {
   text_content: string
   segments: string
   notes: string
+  duration: number
   created_at: string
 }
 
-const TRACK_COLS = 'id, title, audio_file, text_content, segments, notes, created_at'
+const TRACK_COLS = 'id, title, audio_file, text_content, segments, notes, duration, created_at'
 
 export function musicDir(): string {
   const dir = path.join(app.getPath('userData'), 'music')
@@ -44,6 +45,7 @@ function mapTrack(r: TrackRow): TrackItem {
     textContent: r.text_content,
     segments,
     notes: r.notes ?? '',
+    duration: Number(r.duration) || 0,
     createdAt: r.created_at
   }
 }
@@ -90,6 +92,18 @@ export function setTrackText(id: number, text: string): TrackItem {
 export function setTrackNotes(id: number, notes: string): TrackItem {
   const db = getDb()
   db.prepare('UPDATE tracks SET notes = ? WHERE id = ?').run(String(notes ?? ''), Number(id))
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
+    | TrackRow
+    | undefined
+  if (!row) throw new Error('听力条目不存在。')
+  return mapTrack(row)
+}
+
+/** 播放器首次加载到元数据时记录时长（秒），供播放列表显示。 */
+export function setTrackDuration(id: number, seconds: number): TrackItem {
+  const db = getDb()
+  const dur = Math.max(0, Math.round(Number(seconds) || 0))
+  db.prepare('UPDATE tracks SET duration = ? WHERE id = ?').run(dur, Number(id))
   const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
     | TrackRow
     | undefined
@@ -175,7 +189,10 @@ function fallbackSegment(chunk: string): string[] {
 }
 
 /** AI 整理原文：本地清噪 → 分块语义分段 → 合并；单块失败用本地粗分兜底（不中断整体）。 */
-export async function organizeTrack(id: number): Promise<TrackItem> {
+export async function organizeTrack(
+  id: number,
+  onProgress?: (done: number, total: number) => void
+): Promise<TrackItem> {
   const db = getDb()
   const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
     | TrackRow
@@ -190,9 +207,9 @@ export async function organizeTrack(id: number): Promise<TrackItem> {
   const chunks = chunkLines(cleaned, 5000).slice(0, 12)
   const allSegments: string[] = []
   let aiFailedChunks = 0
-  for (const chunk of chunks) {
+  for (let i = 0; i < chunks.length; i++) {
     try {
-      const raw = await chatCompletion(cfg, [{ role: 'user', content: buildOrganizeTextPrompt(row.title, chunk) }], {
+      const raw = await chatCompletion(cfg, [{ role: 'user', content: buildOrganizeTextPrompt(row.title, chunks[i]) }], {
         maxTokens: 3000,
         timeoutMs: 90_000
       })
@@ -204,8 +221,9 @@ export async function organizeTrack(id: number): Promise<TrackItem> {
       allSegments.push(...segs)
     } catch {
       aiFailedChunks++
-      allSegments.push(...fallbackSegment(chunk))
+      allSegments.push(...fallbackSegment(chunks[i]))
     }
+    onProgress?.(i + 1, chunks.length)
   }
   if (allSegments.length === 0) throw new Error('整理失败，请检查文本后重试。')
   db.prepare('UPDATE tracks SET segments = ? WHERE id = ?').run(JSON.stringify(allSegments), Number(id))

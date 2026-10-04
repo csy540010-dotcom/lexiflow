@@ -40,6 +40,7 @@ import {
   importAudioFromPath,
   setTrackText,
   setTrackNotes,
+  setTrackDuration,
   extractWordsFromTrack,
   deleteTrack,
   organizeTrack,
@@ -73,6 +74,8 @@ import {
 import type { AppSettings, SettingsPatch, AiTestResult, WordUpdatePatch, SettingsPatch as Patch } from '../shared/types'
 import { runSelfTest } from './selftest'
 
+let mainWin: BrowserWindow | null = null
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -91,6 +94,9 @@ function createWindow(): BrowserWindow {
   })
 
   win.on('ready-to-show', () => win.show())
+  win.on('closed', () => {
+    if (mainWin === win) mainWin = null
+  })
   win.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
@@ -277,12 +283,24 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('music:setText', (_e, id: number, text: string) => setTrackText(Number(id), String(text ?? '')))
   ipcMain.handle('music:setNotes', (_e, id: number, notes: string) => setTrackNotes(Number(id), String(notes ?? '')))
+  ipcMain.handle('music:setDuration', (_e, id: number, seconds: number) =>
+    setTrackDuration(Number(id), Number(seconds))
+  )
   ipcMain.handle('music:words', (_e, id: number) => extractWordsFromTrack(Number(id)))
   ipcMain.handle('music:delete', (_e, id: number) => deleteTrack(Number(id)))
-  ipcMain.handle('music:organize', (_e, id: number) => organizeTrack(Number(id)))
+  ipcMain.handle('music:organize', (_e, id: number) =>
+    organizeTrack(Number(id), (done, total) => {
+      try {
+        mainWin?.webContents.send('music:organize-progress', { id: Number(id), done, total })
+      } catch {
+        /* 窗口已关 */
+      }
+    })
+  )
   ipcMain.handle('music:tick', (_e, seconds: number) => listeningTick(Number(seconds)))
 
   const win = createWindow()
+  mainWin = win
   console.log('[lexiflow] window created, db ready')
 
   app.on('activate', () => {
@@ -347,6 +365,7 @@ app.whenReady().then(() => {
         importFromPath: importAudioFromPath,
         setText: setTrackText,
         setNotes: setTrackNotes,
+        setDuration: setTrackDuration,
         words: extractWordsFromTrack,
         clean: cleanSubtitleText,
         remove: deleteTrack,

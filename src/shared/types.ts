@@ -252,6 +252,7 @@ export interface TrackItem {
   textContent: string
   segments: string[]
   notes: string
+  duration: number
   createdAt: string
 }
 

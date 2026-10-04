@@ -866,6 +866,32 @@ body {
   font-size: 46px;
 }
 
+.player-subline {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--lf-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wave-strip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  margin-top: 4px;
+}
+
+.wave-strip span {
+  width: 2.5px;
+  border-radius: 2px;
+  background: rgba(66, 119, 101, 0.35);
+}
+
+.speed-left {
+  margin-left: 0;
+  margin-right: auto;
+}
+
 .cover-mini {
   width: 42px;
   height: 42px;

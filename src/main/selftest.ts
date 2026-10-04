@@ -111,10 +111,11 @@ export interface SelfTestHooks {
     translate: (text: string) => Promise<{ translated: string; cached: boolean }>
   }
   music: {
-    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[]; notes: string }>
+    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[]; notes: string; duration: number }>
     importFromPath: (srcPath: string) => { id: number; title: string; audioFile: string }
     setText: (id: number, text: string) => { id: number; textContent: string }
     setNotes: (id: number, notes: string) => { id: number; notes: string }
+    setDuration: (id: number, seconds: number) => { id: number; duration: number }
     words: (id: number) => Array<{ word: string; meaning: string; inBook: boolean }>
     clean: (text: string) => string
     remove: (id: number) => Array<{ id: number }>
@@ -470,6 +471,8 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     )
     hooks.music.setNotes(track.id, '自检笔记：注意连读。')
     assert(hooks.music.list().find((t) => t.id === track.id)?.notes === '自检笔记：注意连读。', '听力：笔记自动保存')
+    hooks.music.setDuration(track.id, 754.4)
+    assert(hooks.music.list().find((t) => t.id === track.id)?.duration === 754, '听力：播放时长记录（列表显示用）')
     const cleanedSub = hooks.music.clean('[ti:0]\n[00:01.74]Hello world.\n[00:04.74]How are you?\n\n[00:09.46]Fine.')
     assert(
       !cleanedSub.includes('[') && cleanedSub.includes('Hello world.') && cleanedSub.split('\n').length === 3,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MusicWordItem, TrackItem } from '../../../shared/types'
 
 function fmtTime(sec: number): string {
@@ -10,13 +10,36 @@ function fmtTime(sec: number): string {
 
 const SPEEDS = [0.75, 1.0, 1.25, 1.5]
 
-type DetailTab = 'raw' | 'organized' | 'words' | 'notes'
-type TopTab = 'mine' | 'online' | 'ai'
+/** 每条音频按标题哈希分配专属配色（多彩封面）。 */
+const COVER_PALETTES: Array<[string, string]> = [
+  ['#427765', '#2f5a4b'], // 深绿
+  ['#3b6ea5', '#274b73'], // 藏蓝
+  ['#a56a3b', '#6e4423'], // 暖棕
+  ['#7a4fa3', '#4d2f6e'], // 紫
+  ['#a54f6a', '#6e2f44'], // 玫红
+  ['#4f8fa5', '#2f5e6e'], // 青
+  ['#8fa54f', '#5e6e2f'], // 橄榄
+  ['#a58b4f', '#6e5a2f'] // 金
+]
 
-/** 装饰波形（按标题生成稳定的高度序列，不随渲染跳动）。 */
-function waveHeights(seed: string, count = 56): number[] {
+function hashStr(s: string): number {
   let h = 0
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+function paletteOf(seed: string): [string, string] {
+  return COVER_PALETTES[hashStr(seed) % COVER_PALETTES.length]
+}
+
+function coverBackground(seed: string): string {
+  const [a, b] = paletteOf(seed)
+  return `linear-gradient(135deg, ${a}, ${b})`
+}
+
+/** 装饰波形（按标题生成稳定的高度序列）。 */
+function waveHeights(seed: string, count = 56): number[] {
+  let h = hashStr(seed) || 1
   const out: number[] = []
   for (let i = 0; i < count; i++) {
     h = (h * 1103515245 + 12345) | 0
@@ -25,13 +48,38 @@ function waveHeights(seed: string, count = 56): number[] {
   return out
 }
 
+type DetailTab = 'raw' | 'organized' | 'words' | 'notes'
+type TopTab = 'mine' | 'online' | 'ai'
+
+interface CoverProps {
+  track: TrackItem
+  size: 'mini' | 'lg'
+}
+
+function TrackCover({ track, size }: CoverProps): React.JSX.Element {
+  if (track.coverFile) {
+    return (
+      <span className={'cover-tile cover-' + size + ' cover-has-img'}>
+        <img src={'lexi-media://music/' + encodeURIComponent(track.coverFile)} alt="" />
+      </span>
+    )
+  }
+  return (
+    <span className={'cover-tile cover-' + size} style={{ background: coverBackground(track.title) }} aria-hidden="true">
+      ♫
+    </span>
+  )
+}
+
 export default function Music(): React.JSX.Element {
   const [tracks, setTracks] = useState<TrackItem[]>([])
   const [selected, setSelected] = useState<TrackItem | null>(null)
   const [topTab, setTopTab] = useState<TopTab>('mine')
   const [tab, setTab] = useState<DetailTab>('raw')
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [textDraft, setTextDraft] = useState('')
   const [notesDraft, setNotesDraft] = useState('')
+  const [collectionDraft, setCollectionDraft] = useState('')
   const [words, setWords] = useState<MusicWordItem[] | null>(null)
   const [wordsBusy, setWordsBusy] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -53,7 +101,6 @@ export default function Music(): React.JSX.Element {
     return list
   }, [])
 
-  // 首次加载：音频列表就绪后自动选中最近一条（主页即播放器界面）
   useEffect(() => {
     void reload().then((list) => {
       if (list.length > 0) setSelected((prev) => prev ?? list[0])
@@ -74,7 +121,7 @@ export default function Music(): React.JSX.Element {
 
   function flash(msg: string): void {
     setToast(msg)
-    window.setTimeout(() => setToast(''), 2600)
+    window.setTimeout(() => setToast(''), 2800)
   }
 
   // 播放中每 5 秒累计听力时间
@@ -90,6 +137,23 @@ export default function Music(): React.JSX.Element {
     }
   }, [playing])
 
+  /** 播放列表按集合分组。 */
+  const groups = useMemo(() => {
+    const map = new Map<string, TrackItem[]>()
+    for (const t of tracks) {
+      const key = t.collection.trim() || '未分类'
+      const bucket = map.get(key)
+      if (bucket) bucket.push(t)
+      else map.set(key, [t])
+    }
+    return [...map.entries()]
+  }, [tracks])
+
+  function applyUpdated(updated: TrackItem): void {
+    setSelected((prev) => (prev && prev.id === updated.id ? updated : prev))
+    setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+  }
+
   async function importAudio(): Promise<void> {
     const track = await window.lexi.importAudio()
     if (!track) return
@@ -102,6 +166,7 @@ export default function Music(): React.JSX.Element {
     setSelected(track)
     setTextDraft(track.textContent)
     setNotesDraft(track.notes)
+    setCollectionDraft(track.collection)
     setTab(track.segments.length > 0 ? 'organized' : 'raw')
     setWords(null)
     setProgress(null)
@@ -122,11 +187,28 @@ export default function Music(): React.JSX.Element {
     }
   }
 
+  async function saveCollection(): Promise<void> {
+    if (!selected) return
+    const trimmed = collectionDraft.trim()
+    if (trimmed === selected.collection) return
+    const updated = await window.lexi.setTrackCollection(selected.id, trimmed)
+    applyUpdated(updated)
+    flash(trimmed ? `已归入集合「${trimmed}」` : '已移出集合（未分类）')
+  }
+
+  async function changeCover(): Promise<void> {
+    if (!selected) return
+    const updated = await window.lexi.pickTrackCover(selected.id)
+    if (updated) {
+      applyUpdated(updated)
+      flash('封面已更新')
+    }
+  }
+
   async function saveText(): Promise<void> {
     if (!selected) return
     const updated = await window.lexi.setText(selected.id, textDraft)
-    setSelected(updated)
-    setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+    applyUpdated(updated)
     setWords(null)
     flash('文本已保存')
   }
@@ -139,15 +221,13 @@ export default function Music(): React.JSX.Element {
     try {
       if (textDraft !== selected.textContent) {
         const saved = await window.lexi.setText(selected.id, textDraft)
-        setSelected(saved)
-        setTracks((prev) => prev.map((t) => (t.id === saved.id ? saved : t)))
+        applyUpdated(saved)
         setWords(null)
       }
       const updated = await window.lexi.organizeTrack(selected.id)
-      setSelected(updated)
-      setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+      applyUpdated(updated)
       setTab('organized')
-      flash(`AI 整理完成：共 ${updated.segments.length} 段（原文 ${updated.textContent.length} 字符全覆盖）`)
+      flash(`AI 整理完成：共 ${updated.segments.length} 段（按语义分段，对话标注男女说话人）`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -156,14 +236,21 @@ export default function Music(): React.JSX.Element {
     }
   }
 
+  async function resetOrganized(): Promise<void> {
+    if (!selected) return
+    if (!window.confirm('重置整理：清空当前的分段结果？（原文不受影响，之后可重新整理）')) return
+    const updated = await window.lexi.clearTrackSegments(selected.id)
+    applyUpdated(updated)
+    flash('整理结果已重置，可重新整理')
+  }
+
   function saveNotes(next: string): void {
     setNotesDraft(next)
     if (!selected) return
     window.clearTimeout(notesTimer.current)
     notesTimer.current = window.setTimeout(async () => {
       const updated = await window.lexi.setTrackNotes(selected.id, next)
-      setSelected(updated)
-      setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+      applyUpdated(updated)
     }, 600)
   }
 
@@ -214,8 +301,7 @@ export default function Music(): React.JSX.Element {
     el.playbackRate = speed
     if (selected && dur > 0 && Math.abs(dur - selected.duration) > 1) {
       const updated = await window.lexi.setTrackDuration(selected.id, dur)
-      setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
-      setSelected((prev) => (prev && prev.id === updated.id ? updated : prev))
+      applyUpdated(updated)
     }
   }
 
@@ -260,7 +346,10 @@ export default function Music(): React.JSX.Element {
         </div>
       ) : tracks.length === 0 ? (
         <div className="card" style={{ maxWidth: 1020 }}>
-          <p className="stub-note">
+          <div className="empty-illustration" aria-hidden="true">
+            <span className="empty-circle">🎧</span>
+          </div>
+          <p className="stub-note" style={{ textAlign: 'center' }}>
             听力库还是空的。点右上角「导入 MP3」选一个音频文件（App 会复制一份副本，你的原文件不动），再粘贴对应文本让 AI 整理。
           </p>
         </div>
@@ -268,18 +357,34 @@ export default function Music(): React.JSX.Element {
         <div className="music-layout">
           <aside className="card music-playlist">
             <p className="playlist-title">我的音频（{tracks.length}）</p>
-            {tracks.map((t) => (
-              <button
-                key={t.id}
-                className={'playlist-item' + (selected?.id === t.id ? ' active' : '')}
-                onClick={() => selectTrack(t)}
-              >
-                <span className="playlist-item-title">♫ {t.title}</span>
-                <span className="playlist-item-meta">
-                  {t.duration > 0 ? fmtTime(t.duration) : t.textContent ? '有文本' : '缺文本'}
-                  {t.segments.length > 0 ? ` · 整理 ${t.segments.length} 段` : ''}
-                </span>
-              </button>
+            {groups.map(([name, items]) => (
+              <div key={name} className="playlist-group">
+                <button
+                  className="playlist-group-head"
+                  onClick={() => setCollapsed((prev) => ({ ...prev, [name]: !prev[name] }))}
+                >
+                  <span className="playlist-group-caret">{collapsed[name] ? '▸' : '▾'}</span>
+                  <span className="playlist-group-name">{name}</span>
+                  <span className="playlist-group-count">{items.length}</span>
+                </button>
+                {!collapsed[name] &&
+                  items.map((t) => (
+                    <button
+                      key={t.id}
+                      className={'playlist-item' + (selected?.id === t.id ? ' active' : '')}
+                      onClick={() => selectTrack(t)}
+                    >
+                      <TrackCover track={t} size="mini" />
+                      <span className="playlist-item-body">
+                        <span className="playlist-item-title">{t.title}</span>
+                        <span className="playlist-item-meta">
+                          {t.duration > 0 ? fmtTime(t.duration) : t.textContent ? '有文本' : '缺文本'}
+                          {t.segments.length > 0 ? ` · 整理 ${t.segments.length} 段` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+              </div>
             ))}
           </aside>
 
@@ -287,23 +392,40 @@ export default function Music(): React.JSX.Element {
             <div className="music-main">
               <div className="card player-card">
                 <div className="player-head">
-                  <div className="cover-tile cover-tile-lg" aria-hidden="true">
-                    ♫
-                  </div>
+                  <TrackCover track={selected} size="lg" />
                   <div className="player-head-main">
                     <h3 className="player-title">{selected.title}</h3>
                     <p className="player-subline">
-                      {playing ? '播放中 · 计入听力时间' : '已暂停'} · {fmtTime(current)} / {fmtTime(duration || selected.duration)}
+                      {playing ? '播放中 · 计入听力时间' : '已暂停'} · {fmtTime(current)} /{' '}
+                      {fmtTime(duration || selected.duration)}
                     </p>
                     <div className="wave-strip" aria-hidden="true">
                       {waveHeights(selected.title).map((h, i) => (
                         <span key={i} style={{ height: h + 'px' }} />
                       ))}
                     </div>
+                    <div className="collection-line">
+                      <span>集合：</span>
+                      <input
+                        className="collection-input"
+                        value={collectionDraft}
+                        placeholder="未分类（输入后回车归类）"
+                        onChange={(e) => setCollectionDraft(e.target.value)}
+                        onBlur={() => void saveCollection()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                        }}
+                      />
+                    </div>
                   </div>
-                  <button className="text-btn task-remove" onClick={() => void removeTrack(selected)}>
-                    删除
-                  </button>
+                  <div className="player-head-actions">
+                    <button className="text-btn" onClick={() => void changeCover()}>
+                      换封面
+                    </button>
+                    <button className="text-btn task-remove" onClick={() => void removeTrack(selected)}>
+                      删除
+                    </button>
+                  </div>
                 </div>
                 <audio
                   ref={audioRef}
@@ -378,7 +500,7 @@ export default function Music(): React.JSX.Element {
                 {tab === 'raw' && (
                   <>
                     <p className="section-note">
-                      粘贴或修改对应文本，再点「AI 整理文本」：自动去掉时间戳、按语义分段，覆盖全文不截断。
+                      粘贴或修改对应文本，再点「AI 整理文本」：自动去掉时间戳、按语义分段、对话标注男女说话人，覆盖全文不截断。
                     </p>
                     <textarea
                       className="notes-area"
@@ -397,16 +519,26 @@ export default function Music(): React.JSX.Element {
 
                 {tab === 'organized' &&
                   (selected.segments.length === 0 ? (
-                    <p className="stub-note">还没有整理结果。先切到「原文」贴上文本，再点右上角「AI 整理文本」。</p>
+                    <p className="stub-note">还没有整理结果。先切到「原文」贴上文本，再点「AI 整理文本」。</p>
                   ) : (
-                    <ol className="segment-list">
-                      {selected.segments.map((seg, i) => (
-                        <li key={i} className="segment-item">
-                          <span className="segment-index">{i + 1}</span>
-                          <p>{seg}</p>
-                        </li>
-                      ))}
-                    </ol>
+                    <>
+                      <ol className="segment-list">
+                        {selected.segments.map((seg, i) => (
+                          <li key={i} className="segment-item">
+                            <span className="segment-index">{i + 1}</span>
+                            <p>{seg}</p>
+                          </li>
+                        ))}
+                      </ol>
+                      <div className="organized-foot">
+                        <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void organize()}>
+                          {busy ? '整理中…' : 'AI 重新整理'}
+                        </button>
+                        <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void resetOrganized()}>
+                          AI 重置整理
+                        </button>
+                      </div>
+                    </>
                   ))}
 
                 {tab === 'words' && (

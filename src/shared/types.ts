@@ -253,6 +253,8 @@ export interface TrackItem {
   segments: string[]
   notes: string
   duration: number
+  collection: string
+  coverFile: string
   createdAt: string
 }
 

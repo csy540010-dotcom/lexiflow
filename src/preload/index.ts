@@ -110,6 +110,10 @@ const api = {
   setTrackNotes: (id: number, notes: string): Promise<TrackItem> => ipcRenderer.invoke('music:setNotes', id, notes),
   setTrackDuration: (id: number, seconds: number): Promise<TrackItem> =>
     ipcRenderer.invoke('music:setDuration', id, seconds),
+  setTrackCollection: (id: number, name: string): Promise<TrackItem> =>
+    ipcRenderer.invoke('music:setCollection', id, name),
+  pickTrackCover: (id: number): Promise<TrackItem | null> => ipcRenderer.invoke('music:pickCover', id),
+  clearTrackSegments: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:clearSegments', id),
   extractTrackWords: (id: number): Promise<MusicWordItem[]> => ipcRenderer.invoke('music:words', id),
   deleteTrack: (id: number): Promise<TrackItem[]> => ipcRenderer.invoke('music:delete', id),
   organizeTrack: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:organize', id),

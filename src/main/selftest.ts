@@ -111,11 +111,14 @@ export interface SelfTestHooks {
     translate: (text: string) => Promise<{ translated: string; cached: boolean }>
   }
   music: {
-    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[]; notes: string; duration: number }>
+    list: () => Array<{ id: number; title: string; audioFile: string; textContent: string; segments: string[]; notes: string; duration: number; collection: string; coverFile: string }>
     importFromPath: (srcPath: string) => { id: number; title: string; audioFile: string }
     setText: (id: number, text: string) => { id: number; textContent: string }
     setNotes: (id: number, notes: string) => { id: number; notes: string }
     setDuration: (id: number, seconds: number) => { id: number; duration: number }
+    setCollection: (id: number, name: string) => { id: number; collection: string }
+    importCover: (id: number, srcPath: string) => { id: number; coverFile: string }
+    clearSegments: (id: number) => { id: number; segments: string[] }
     words: (id: number) => Array<{ word: string; meaning: string; inBook: boolean }>
     clean: (text: string) => string
     remove: (id: number) => Array<{ id: number }>
@@ -473,6 +476,15 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(hooks.music.list().find((t) => t.id === track.id)?.notes === '自检笔记：注意连读。', '听力：笔记自动保存')
     hooks.music.setDuration(track.id, 754.4)
     assert(hooks.music.list().find((t) => t.id === track.id)?.duration === 754, '听力：播放时长记录（列表显示用）')
+    assert(hooks.music.setCollection(track.id, '真题听力').collection === '真题听力', '听力：集合归类')
+    const coverSrc = path.join(selftestDir, 'm6-cover.png')
+    fs.writeFileSync(coverSrc, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]))
+    const withCover = hooks.music.importCover(track.id, coverSrc)
+    assert(withCover.coverFile.length > 0, `听力：封面图导入（${withCover.coverFile}）`)
+    const coverCopied = path.join(process.env.APPDATA || '', 'lexiflow', 'music', withCover.coverFile)
+    assert(fs.existsSync(coverCopied), '听力：封面副本已保存到 App 数据目录')
+    getDb().prepare('UPDATE tracks SET segments = ? WHERE id = ?').run(JSON.stringify(['a', 'b']), track.id)
+    assert(hooks.music.clearSegments(track.id).segments.length === 0, '听力：AI 重置整理清空分段')
     const cleanedSub = hooks.music.clean('[ti:0]\n[00:01.74]Hello world.\n[00:04.74]How are you?\n\n[00:09.46]Fine.')
     assert(
       !cleanedSub.includes('[') && cleanedSub.includes('Hello world.') && cleanedSub.split('\n').length === 3,
@@ -485,6 +497,7 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(hooks.stats.summary(7).listeningMinutes === baselineM6.listeningMinutes, '听力：听力时间已回退')
     hooks.music.remove(track.id)
     assert(!hooks.music.list().some((t) => t.id === track.id), '听力：删除条目（音频副本同步删除）')
+    assert(!fs.existsSync(coverCopied), '听力：删除条目（封面副本同步删除）')
 
     // 10. 截图：词汇库 + 单词详情
     fs.mkdirSync(selftestDir, { recursive: true })

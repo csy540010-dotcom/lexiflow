@@ -41,6 +41,9 @@ import {
   setTrackText,
   setTrackNotes,
   setTrackDuration,
+  setTrackCollection,
+  importCover,
+  clearSegments,
   extractWordsFromTrack,
   deleteTrack,
   organizeTrack,
@@ -286,6 +289,19 @@ app.whenReady().then(() => {
   ipcMain.handle('music:setDuration', (_e, id: number, seconds: number) =>
     setTrackDuration(Number(id), Number(seconds))
   )
+  ipcMain.handle('music:setCollection', (_e, id: number, name: string) =>
+    setTrackCollection(Number(id), String(name ?? ''))
+  )
+  ipcMain.handle('music:pickCover', async (_e, id: number) => {
+    const result = await dialog.showOpenDialog({
+      title: '选择封面图片',
+      properties: ['openFile'],
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return importCover(Number(id), result.filePaths[0])
+  })
+  ipcMain.handle('music:clearSegments', (_e, id: number) => clearSegments(Number(id)))
   ipcMain.handle('music:words', (_e, id: number) => extractWordsFromTrack(Number(id)))
   ipcMain.handle('music:delete', (_e, id: number) => deleteTrack(Number(id)))
   ipcMain.handle('music:organize', (_e, id: number) =>
@@ -366,6 +382,9 @@ app.whenReady().then(() => {
         setText: setTrackText,
         setNotes: setTrackNotes,
         setDuration: setTrackDuration,
+        setCollection: setTrackCollection,
+        importCover,
+        clearSegments,
         words: extractWordsFromTrack,
         clean: cleanSubtitleText,
         remove: deleteTrack,

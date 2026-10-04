@@ -19,10 +19,12 @@ interface TrackRow {
   segments: string
   notes: string
   duration: number
+  collection: string
+  cover_file: string
   created_at: string
 }
 
-const TRACK_COLS = 'id, title, audio_file, text_content, segments, notes, duration, created_at'
+const TRACK_COLS = 'id, title, audio_file, text_content, segments, notes, duration, collection, cover_file, created_at'
 
 export function musicDir(): string {
   const dir = path.join(app.getPath('userData'), 'music')
@@ -46,6 +48,8 @@ function mapTrack(r: TrackRow): TrackItem {
     segments,
     notes: r.notes ?? '',
     duration: Number(r.duration) || 0,
+    collection: r.collection ?? '',
+    coverFile: r.cover_file ?? '',
     createdAt: r.created_at
   }
 }
@@ -111,6 +115,51 @@ export function setTrackDuration(id: number, seconds: number): TrackItem {
   return mapTrack(row)
 }
 
+/** 设置所属集合（分组显示用）。 */
+export function setTrackCollection(id: number, name: string): TrackItem {
+  const db = getDb()
+  db.prepare('UPDATE tracks SET collection = ? WHERE id = ?').run(String(name ?? '').trim().slice(0, 40), Number(id))
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
+    | TrackRow
+    | undefined
+  if (!row) throw new Error('听力条目不存在。')
+  return mapTrack(row)
+}
+
+/** 导入封面图：复制进 App 数据目录（替换旧封面时清理旧文件）。 */
+export function importCover(id: number, srcPath: string): TrackItem {
+  if (!fs.existsSync(srcPath)) throw new Error('图片文件不存在。')
+  const db = getDb()
+  const old = db.prepare('SELECT cover_file FROM tracks WHERE id = ?').get(Number(id)) as
+    | { cover_file: string }
+    | undefined
+  if (!old) throw new Error('听力条目不存在。')
+  const ext = (path.extname(srcPath).toLowerCase() || '.png').replace(/[^.\w]/g, '')
+  const name = `cover-${Number(id)}-${Date.now()}${ext}`
+  fs.copyFileSync(srcPath, path.join(musicDir(), name))
+  db.prepare('UPDATE tracks SET cover_file = ? WHERE id = ?').run(name, Number(id))
+  if (old.cover_file) {
+    try {
+      fs.unlinkSync(path.join(musicDir(), old.cover_file))
+    } catch {
+      /* 旧封面已不在也无妨 */
+    }
+  }
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as unknown as TrackRow
+  return mapTrack(row)
+}
+
+/** AI 重置整理：清空分段结果（重新整理前用）。 */
+export function clearSegments(id: number): TrackItem {
+  const db = getDb()
+  db.prepare("UPDATE tracks SET segments = '[]' WHERE id = ?").run(Number(id))
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as
+    | TrackRow
+    | undefined
+  if (!row) throw new Error('听力条目不存在。')
+  return mapTrack(row)
+}
+
 /** 从听力文本里析出词典收录的单词（生词标签用；按首次出现排序）。 */
 export function extractWordsFromTrack(id: number): MusicWordItem[] {
   const db = getDb()
@@ -139,13 +188,17 @@ export function extractWordsFromTrack(id: number): MusicWordItem[] {
 
 export function deleteTrack(id: number): TrackItem[] {
   const db = getDb()
-  const row = db.prepare('SELECT audio_file FROM tracks WHERE id = ?').get(Number(id)) as { audio_file: string } | undefined
+  const row = db.prepare('SELECT audio_file, cover_file FROM tracks WHERE id = ?').get(Number(id)) as
+    | { audio_file: string; cover_file: string }
+    | undefined
   db.prepare('DELETE FROM tracks WHERE id = ?').run(Number(id))
-  if (row?.audio_file) {
-    try {
-      fs.unlinkSync(path.join(musicDir(), row.audio_file))
-    } catch {
-      /* 文件已不在也无妨 */
+  for (const file of [row?.audio_file, row?.cover_file]) {
+    if (file) {
+      try {
+        fs.unlinkSync(path.join(musicDir(), file))
+      } catch {
+        /* 文件已不在也无妨 */
+      }
     }
   }
   return listTracks()

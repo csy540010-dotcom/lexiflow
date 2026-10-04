@@ -230,9 +230,6 @@ export default function PracticeCenter(): React.JSX.Element {
 
       {!busy && !error && item && word && engine === 'mcq' && question && (
         <div className="card module-card">
-          <p className="practice-word-line">
-            考察词：<strong>{question.word}</strong>
-          </p>
           <p className="mcq-stem">{question.stem}</p>
           <div className="mcq-options">
             {question.options.map((opt, i) => {

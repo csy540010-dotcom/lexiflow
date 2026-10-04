@@ -56,9 +56,9 @@ export function extractPrompts(text: string): string[] {
 /** 专项练习出题提示词：选择题三类（语境选词 / 搭配辨析 / 近义词辨析）。 */
 export function buildMcqPrompt(word: string, meaning: string, type: 'context' | 'collocation' | 'synonym'): string {
   const specs: Record<string, string> = {
-    context: `出「语境选词」题：写一个地道的英文例句，把其中的 ${word} 挖掉用 ____ 代替；四个选项为 ${word} 和三个词性与它相同、容易混淆的英语词。学习者靠上下文选词。`,
-    collocation: `出「搭配辨析」题：写一个含空格的英文短句，空格处应填入与 ${word} 相关的地道搭配（介词、固定短语等）；四个选项里只有一个地道正确，其余是学习者常犯的搭配错误。`,
-    synonym: `出「近义词辨析」题：写一个英文短句挖空，四个选项为 ${word} 和三个语义相近的词；只有 ${word} 符合该句语境（可结合中文释义设计迷惑项）。释义：${meaning}`
+    context: `出「语境选词」题：写一个地道的英文例句，把其中的 ${word} 挖掉用 ____ 代替；四个选项为 ${word} 和三个词性与它相同、容易混淆的英语词。学习者靠上下文选词。题干句子除挖空处外，不得出现 ${word} 这个词本身。`,
+    collocation: `出「搭配辨析」题：写一个含空格的英文短句，空格处应填入与 ${word} 相关的地道搭配（介词、固定短语等）；四个选项里只有一个地道正确，其余是学习者常犯的搭配错误。题干句子除挖空处外，不得出现 ${word} 或其词形变化。`,
+    synonym: `出「近义词辨析」题：写一个英文短句挖空，四个选项为 ${word} 和三个语义相近的词；只有 ${word} 符合该句语境（可结合中文释义设计迷惑项）。题干句子除挖空处外，不得出现 ${word} 或其他选项词。释义：${meaning}`
   }
   return [
     '你是英语老师，面向中国学习者出专项练习题。',

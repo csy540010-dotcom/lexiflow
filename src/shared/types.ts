@@ -181,6 +181,7 @@ export interface ReviewQueueResult {
   items: ReviewItem[]
   counts: Record<ReviewReason, number>
   total: number
+  graduateLine: number
 }
 
 export type PracticeType = 'translate' | 'free' | 'redo' | 'context' | 'collocation' | 'synonym'

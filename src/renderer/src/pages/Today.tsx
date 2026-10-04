@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { BookSummary, CustomTaskItem, TodaySummary } from '../../../shared/types'
+import type { BookSummary, CustomTaskItem, PlanSettings, TodaySummary } from '../../../shared/types'
+import PlanModal from '../components/PlanModal'
 
 const TASK_KINDS: Array<{ id: string; icon: string; label: string }> = [
   { id: 'listening', icon: '🎧', label: '听力' },
@@ -18,6 +19,8 @@ export default function Today(): React.JSX.Element {
   const [summary, setSummary] = useState<TodaySummary | null>(null)
   const [books, setBooks] = useState<BookSummary[]>([])
   const [tasks, setTasks] = useState<CustomTaskItem[]>([])
+  const [plan, setPlan] = useState<PlanSettings | null>(null)
+  const [showPlan, setShowPlan] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newKind, setNewKind] = useState('listening')
   const [newTitle, setNewTitle] = useState('')
@@ -25,10 +28,16 @@ export default function Today(): React.JSX.Element {
   const [toast, setToast] = useState('')
 
   const reload = useCallback(async () => {
-    const [s, b, t] = await Promise.all([window.lexi.studySummary(), window.lexi.listBooks(), window.lexi.listTasks()])
+    const [s, b, t, settings] = await Promise.all([
+      window.lexi.studySummary(),
+      window.lexi.listBooks(),
+      window.lexi.listTasks(),
+      window.lexi.getSettings()
+    ])
     setSummary(s)
     setBooks(b)
     setTasks(t)
+    setPlan(settings.plan)
   }, [])
 
   useEffect(() => {
@@ -216,7 +225,28 @@ export default function Today(): React.JSX.Element {
             今日已批改 {summary.gradedToday} 个词
           </p>
         )}
+        {plan && (
+          <div className="plan-line">
+            <span>
+              每日计划：新词 {plan.dailyNew} · 复习上限 {plan.dailyReviewLimit} · {plan.dailyMinutes} 分钟 · 强度{' '}
+              {plan.reviewIntensity}/5
+            </span>
+            <button className="text-btn" onClick={() => setShowPlan(true)}>
+              调整计划 ⚙
+            </button>
+          </div>
+        )}
       </div>
+
+      {showPlan && (
+        <PlanModal
+          onClose={() => setShowPlan(false)}
+          onSaved={() => {
+            void reload()
+            flash('学习计划已保存，立即生效')
+          }}
+        />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </section>

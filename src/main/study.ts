@@ -6,7 +6,7 @@ import { getWord } from './library'
 import { getAiConfig } from './settings'
 import type { CustomTaskItem, TodaySummary, SentenceFavoriteItem } from '../shared/types'
 
-function planNumber(meta: 'dailyNew' | 'dailyReviewLimit' | 'dailyMinutes' | 'reviewIntensity'): number {
+export function planNumber(meta: 'dailyNew' | 'dailyReviewLimit' | 'dailyMinutes' | 'reviewIntensity'): number {
   try {
     const raw = kvGet('app_settings')
     if (raw) {
@@ -88,12 +88,24 @@ export function todaySummary(bookId?: number): TodaySummary {
         .get() as { n: number }
     ).n
   )
+  // 今日已学新词（首次从「未学习」进入学习状态时留下 learn 事件），按当前词书统计
+  const learnedToday = Number(
+    (
+      db
+        .prepare(
+          `SELECT COUNT(DISTINCT json_extract(payload, '$.wordId')) AS n FROM study_events
+           WHERE kind = 'learn' AND json_extract(payload, '$.date') = ?
+             AND json_extract(payload, '$.wordId') IN (SELECT id FROM words WHERE book_id = ?)`
+        )
+        .get(todayKey(), id) as { n: number }
+    ).n
+  )
   return {
     bookId: book.id,
     bookName: book.name,
     totalWords: Number(counts.total),
     learnedWords: Number(counts.learned ?? 0),
-    newRemaining: Math.max(0, Math.min(dailyNew, unlearned)),
+    newRemaining: Math.max(0, Math.min(dailyNew - learnedToday, unlearned)),
     reviewDue,
     gradedToday,
     dailyNew,
@@ -172,6 +184,12 @@ export async function gradeSentence(wordId: number, sentence: string): Promise<{
     )
   } else {
     db.prepare('UPDATE words SET mastery = ?, status = ? WHERE id = ?').run(JSON.stringify(mastery), status, wordId)
+  }
+  if (word.status === 0 && status > 0) {
+    // 今日新词计数：这个词今天首次从「未学习」进入学习
+    db.prepare("INSERT INTO study_events (kind, payload) VALUES ('learn', ?)").run(
+      JSON.stringify({ date: todayKey(), wordId })
+    )
   }
   return { grade, word: getWord(wordId) }
 }

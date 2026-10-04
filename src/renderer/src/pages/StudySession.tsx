@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { GradePayload, SentenceFavoriteItem, WordDetailData } from '../../../shared/types'
 import MasteryDots from '../components/MasteryDots'
+import PlanModal from '../components/PlanModal'
 
 const SCORE_DIMS: Array<{ key: keyof GradePayload['scores']; label: string }> = [
   { key: 'usage', label: '词义使用' },
@@ -48,6 +49,7 @@ export default function StudySession(): React.JSX.Element {
   const [error, setError] = useState('')
   const [finished, setFinished] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showPlan, setShowPlan] = useState(false)
   const [toast, setToast] = useState('')
 
   useEffect(() => {
@@ -78,8 +80,10 @@ export default function StudySession(): React.JSX.Element {
   }
 
   useEffect(() => {
-    if (queue[idx] !== undefined) loadWord(queue[idx])
-  }, [idx, queue, loadWord])
+    const id = queue[idx]
+    // 同一词不重复加载（计划调整后队列刷新时不打断手头这个词）
+    if (id !== undefined && id !== word?.id) loadWord(id)
+  }, [idx, queue, word?.id, loadWord])
 
   async function generateExplain(): Promise<void> {
     if (!word) return
@@ -158,6 +162,15 @@ export default function StudySession(): React.JSX.Element {
     if (w) setWord(w)
   }
 
+  async function onPlanSaved(): Promise<void> {
+    // 队列按新的每日新词量重建；当前词若仍在队列中，保持位置不打断
+    const ids = await window.lexi.studyQueue()
+    const cur = word?.id
+    setQueue(ids)
+    if (cur !== undefined && ids.includes(cur)) setIdx(ids.indexOf(cur))
+    flash('学习计划已保存，队列已按新词汇量更新')
+  }
+
   if (loading) {
     return (
       <section>
@@ -204,9 +217,14 @@ export default function StudySession(): React.JSX.Element {
         <Link to="/today" className="back-link">
           ← 返回今日学习
         </Link>
-        <span className="session-progress">
-          {idx + 1} / {queue.length}
-        </span>
+        <div className="detail-pager">
+          <span className="session-progress">
+            {idx + 1} / {queue.length}
+          </span>
+          <button className="text-btn" onClick={() => setShowPlan(true)}>
+            计划 ⚙
+          </button>
+        </div>
       </div>
 
       {word && (
@@ -370,6 +388,7 @@ export default function StudySession(): React.JSX.Element {
               {idx === queue.length - 1 ? '完成本组 ✓' : '下一个词 →'}
             </button>
           </div>
+          {showPlan && <PlanModal onClose={() => setShowPlan(false)} onSaved={() => void onPlanSaved()} />}
           {toast && <div className="toast">{toast}</div>}
         </>
       )}

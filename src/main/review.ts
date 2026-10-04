@@ -1,6 +1,6 @@
 import { getDb } from './db'
 import { getWord } from './library'
-import { resolveBookId } from './study'
+import { resolveBookId, planNumber } from './study'
 import type { WordDetailData } from '../shared/types'
 
 /**
@@ -29,9 +29,16 @@ export interface ReviewQueueResult {
   items: ReviewItem[]
   counts: Record<ReviewReason, number>
   total: number
+  /** 毕业线（四维均分达标线）：由「复习强度」计划参数决定，1→3.0 轻松，5→4.0 强化 */
+  graduateLine: number
 }
 
 const REASON_ORDER: ReviewReason[] = ['relearn', 'usage', 'collocation', 'transfer']
+
+export function graduateLineFor(intensity: number): number {
+  const v = Math.min(5, Math.max(1, Math.round(intensity)))
+  return Math.round((3.0 + (v - 1) * 0.25) * 100) / 100
+}
 
 function shuffle<T>(list: T[]): T[] {
   const out = [...list]
@@ -60,13 +67,15 @@ export function weaknessOf(word: WordDetailData): ReviewReason {
 
 export function reviewQueue(bookId?: number): ReviewQueueResult {
   const id = resolveBookId(bookId)
+  const limit = Math.max(1, planNumber('dailyReviewLimit'))
+  const graduateLine = graduateLineFor(planNumber('reviewIntensity'))
   const rows = getDb()
     .prepare(
       `SELECT w.id, w.headword FROM review_queue rq JOIN words w ON w.id = rq.word_id
        WHERE w.book_id = ? AND rq.due_date <= date('now', 'localtime')
-       ORDER BY rq.due_date, w.id`
+       ORDER BY rq.due_date, w.id LIMIT ?`
     )
-    .all(id) as unknown as Array<{ id: number; headword: string }>
+    .all(id, limit) as unknown as Array<{ id: number; headword: string }>
 
   const buckets: Record<ReviewReason, ReviewItem[]> = { relearn: [], usage: [], collocation: [], transfer: [] }
   for (const row of rows) {
@@ -80,7 +89,7 @@ export function reviewQueue(bookId?: number): ReviewQueueResult {
   }
   const items = REASON_ORDER.flatMap((reason) => shuffle(buckets[reason]))
   const counts = { relearn: buckets.relearn.length, usage: buckets.usage.length, collocation: buckets.collocation.length, transfer: buckets.transfer.length }
-  return { items, counts, total: items.length }
+  return { items, counts, total: items.length, graduateLine }
 }
 
 /** 复习事件留痕（统计分析用）。 */

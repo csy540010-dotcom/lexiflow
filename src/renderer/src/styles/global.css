@@ -855,6 +855,18 @@ body {
   color: var(--lf-muted);
 }
 
+.plan-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--lf-line);
+  font-size: 12px;
+  color: var(--lf-muted);
+}
+
 /* ── 单词学习会话 ─────────────────────────── */
 .session-progress {
   font-size: 13px;

@@ -54,7 +54,7 @@ interface StudyHooks {
 }
 
 interface ReviewHooks {
-  queue: () => { items: Array<{ wordId: number; headword: string; reason: string }>; counts: Record<string, number>; total: number }
+  queue: () => { items: Array<{ wordId: number; headword: string; reason: string }>; counts: Record<string, number>; total: number; graduateLine: number }
   graduate: (wordId: number) => void
   tape: (wordId: number) => void
   seed: (wordId: number, dueDate: string) => void
@@ -261,10 +261,11 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     // 9.6 今日学习：摘要 / 队列 / 自定义任务
     hooks.study.selectBook(hooks.library.listBooks().find((b) => b.slug === 'cet4')!.id)
     const sum = hooks.study.summary()
-    assert(sum.bookName === '大学英语四级词书' && sum.newRemaining === 20 && sum.totalWords === 4544,
-      `今日摘要（新词 ${sum.newRemaining} / 全书 ${sum.totalWords}）`)
+    assert(sum.bookName === '大学英语四级词书' && sum.totalWords === 4544 && sum.dailyNew === 20,
+      `今日摘要（全书 ${sum.totalWords} / 每日 ${sum.dailyNew}）`)
+    assert(sum.newRemaining >= 0 && sum.newRemaining <= sum.dailyNew, `今日剩余新词按计划计数（${sum.newRemaining}）`)
     const q = hooks.study.queue()
-    assert(q.length === 20, `今日队列 20 词（实际 ${q.length}）`)
+    assert(q.length === Math.min(sum.dailyNew, sum.totalWords - sum.learnedWords), `今日队列 ${q.length} 词（≤ 每日新词量）`)
     let tasks = hooks.study.tasks.add('reading', '六级阅读', '1 篇')
     assert(tasks.length === 1 && tasks[0].doneToday === false, '自定义任务：添加')
     tasks = hooks.study.tasks.toggle(tasks[0].id, true)
@@ -310,6 +311,27 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     hooks.review.graduate(q[1])
     assert(hooks.review.queue().items.every((i) => i.wordId !== q[0] && i.wordId !== q[1]), '种子已清理')
     hooks.stats.cleanupReviewEvents([q[0], q[1]])
+
+    // 9.85 学习计划调节：词汇量（每日新词）/ 复习上限 / 复习强度（毕业线）
+    const planSnap = hooks.loadSettings().plan
+    hooks.saveSettingsPatch({ plan: { dailyNew: 3 } })
+    assert(hooks.study.queue().length === 3, '计划调节：每日新词量=3 → 学习队列跟随')
+    hooks.saveSettingsPatch({ plan: { dailyReviewLimit: 1 } })
+    hooks.review.seed(q[0], '2026-10-04')
+    hooks.review.seed(q[1], '2026-10-04')
+    assert(hooks.review.queue().total === 1, `计划调节：复习上限=1 → 复习队列 1 词（实际 ${hooks.review.queue().total}）`)
+    hooks.review.graduate(q[0])
+    hooks.review.graduate(q[1])
+    hooks.saveSettingsPatch({ plan: { reviewIntensity: 1 } })
+    assert(hooks.review.queue().graduateLine === 3, '计划调节：强度=轻松 → 毕业线 3.0')
+    hooks.saveSettingsPatch({ plan: { reviewIntensity: 5 } })
+    assert(hooks.review.queue().graduateLine === 4, '计划调节：强度=强化 → 毕业线 4.0')
+    hooks.stats.cleanupReviewEvents([q[0], q[1]])
+    hooks.saveSettingsPatch({ plan: planSnap })
+    assert(
+      hooks.loadSettings().plan.dailyNew === planSnap.dailyNew && hooks.study.queue().length === Math.min(planSnap.dailyNew, sum.totalWords - sum.learnedWords),
+      '计划调节：用户原计划已恢复'
+    )
 
     // 9.9 选择题解析回归（修复：批改解析器要求 issues 字段，导致选择类练习全部「格式异常」）
     const mcq1 = hooks.parse.mcq(

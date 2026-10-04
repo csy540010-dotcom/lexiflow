@@ -24,8 +24,6 @@ const GRADE_DIMS: Array<{ key: keyof GradePayload['scores']; label: string }> = 
   { key: 'naturalness', label: '自然度' }
 ]
 
-const GRADUATE_LINE = 3.5
-
 type Outcome = 'graduated' | 'taped' | null
 
 export default function ReviewSession(): React.JSX.Element {
@@ -73,7 +71,7 @@ export default function ReviewSession(): React.JSX.Element {
         setGrade(r.grade.scores ? r.grade : null)
         const s = r.grade.scores
         const avg = (s.usage + s.grammar + s.collocation + s.naturalness) / 4
-        if (avg >= GRADUATE_LINE) {
+        if (avg >= graduateLine) {
           await window.lexi.graduateReview(word.id)
           setOutcome('graduated')
           setStats((v) => ({ ...v, graduated: v.graduated + 1 }))
@@ -149,6 +147,7 @@ export default function ReviewSession(): React.JSX.Element {
   }
 
   const item = queue.items[idx]
+  const graduateLine = queue.graduateLine || 3.5
   const avg =
     grade && grade.scores
       ? (grade.scores.usage + grade.scores.grammar + grade.scores.collocation + grade.scores.naturalness) / 4
@@ -254,7 +253,7 @@ export default function ReviewSession(): React.JSX.Element {
               {outcome === 'graduated' ? (
                 <>
                   <p className="review-outcome-title">✓ 毕业出队</p>
-                  <p className="section-note">四维均分 {avg.toFixed(1)} ≥ {GRADUATE_LINE}，这个词从复习队列毕业，不再自动回来。</p>
+                  <p className="section-note">四维均分 {avg.toFixed(1)} ≥ {graduateLine}，这个词从复习队列毕业，不再自动回来。</p>
                 </>
               ) : (
                 <>

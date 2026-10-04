@@ -26,6 +26,7 @@ function migrate(db: Database.Database): void {
       slug TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       source TEXT NOT NULL DEFAULT 'local',
+      cover_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -124,6 +125,7 @@ function migrate(db: Database.Database): void {
       duration INTEGER NOT NULL DEFAULT 0,
       collection TEXT NOT NULL DEFAULT '',
       cover_file TEXT NOT NULL DEFAULT '',
+      cover_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -165,6 +167,17 @@ function migrate(db: Database.Database): void {
   }
   try {
     db.exec("ALTER TABLE tracks ADD COLUMN cover_file TEXT NOT NULL DEFAULT ''")
+  } catch {
+    /* 已存在 */
+  }
+  // 旧库补列：books.cover_id / tracks.cover_id（封面库分配）
+  try {
+    db.exec("ALTER TABLE books ADD COLUMN cover_id TEXT NOT NULL DEFAULT ''")
+  } catch {
+    /* 已存在 */
+  }
+  try {
+    db.exec("ALTER TABLE tracks ADD COLUMN cover_id TEXT NOT NULL DEFAULT ''")
   } catch {
     /* 已存在 */
   }

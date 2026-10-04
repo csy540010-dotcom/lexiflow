@@ -10,6 +10,7 @@ import {
   createBook,
   renameBook,
   deleteBook,
+  setBookCover,
   queryWords,
   getWord,
   updateWord,
@@ -18,6 +19,7 @@ import {
   type WordQueryArgs
 } from './library'
 import { detectObsidianData, importObsidianData, removeImportedBooks } from './import-obsidian'
+import { ensureUniqueCovers } from './covers'
 import { reviewQueue, graduateReview, tapeReview, enqueueReview } from './review'
 import { PRACTICE_TYPES, practicePool, redoPool, genMcq, genSentenceTask, recordPractice } from './practice'
 import type { PracticeType } from '../shared/types'
@@ -44,6 +46,7 @@ import {
   setTrackCollection,
   importCover,
   clearSegments,
+  setTrackCoverLib,
   extractWordsFromTrack,
   deleteTrack,
   organizeTrack,
@@ -171,6 +174,7 @@ app.whenReady().then(() => {
   try {
     const dict = ensureDictionaryImported()
     const books = ensureBuiltinBooks()
+    ensureUniqueCovers()
     console.log(
       `[lexiflow] dictionary ${dict.imported ? `imported ${dict.words} entries` : 'ready'}, builtin books ${books.created ? `seeded ${books.words} words` : 'ready'}`
     )
@@ -196,6 +200,9 @@ app.whenReady().then(() => {
   ipcMain.handle('library:books:create', (_e, name: string) => createBook(String(name ?? '')))
   ipcMain.handle('library:books:rename', (_e, id: number, name: string) => renameBook(Number(id), String(name ?? '')))
   ipcMain.handle('library:books:delete', (_e, id: number) => deleteBook(Number(id)))
+  ipcMain.handle('library:books:setCover', (_e, id: number, coverId: string) =>
+    setBookCover(Number(id), String(coverId ?? ''))
+  )
   ipcMain.handle('library:words:query', (_e, args: WordQueryArgs) => queryWords(args))
   ipcMain.handle('library:words:get', (_e, id: number) => getWord(Number(id)))
   ipcMain.handle('library:words:update', (_e, id: number, patch: WordUpdatePatch) => updateWord(Number(id), patch))
@@ -302,6 +309,9 @@ app.whenReady().then(() => {
     return importCover(Number(id), result.filePaths[0])
   })
   ipcMain.handle('music:clearSegments', (_e, id: number) => clearSegments(Number(id)))
+  ipcMain.handle('music:setCoverLib', (_e, id: number, coverId: string) =>
+    setTrackCoverLib(Number(id), String(coverId ?? ''))
+  )
   ipcMain.handle('music:words', (_e, id: number) => extractWordsFromTrack(Number(id)))
   ipcMain.handle('music:delete', (_e, id: number) => deleteTrack(Number(id)))
   ipcMain.handle('music:organize', (_e, id: number) =>
@@ -337,7 +347,8 @@ app.whenReady().then(() => {
         updateWord,
         move: moveWordToBook,
         createBook,
-        deleteBook
+        deleteBook,
+        setCover: setBookCover
       },
       import: {
         detect: detectObsidianData,
@@ -384,6 +395,7 @@ app.whenReady().then(() => {
         setDuration: setTrackDuration,
         setCollection: setTrackCollection,
         importCover,
+        setCoverLib: setTrackCoverLib,
         clearSegments,
         words: extractWordsFromTrack,
         clean: cleanSubtitleText,

@@ -1481,7 +1481,21 @@ body {
   border: 1px solid var(--lf-line);
   border-radius: var(--lf-radius);
   max-width: 760px;
+  height: 190px;
   box-shadow: 0 5px 22px rgba(0, 0, 0, 0.03);
+}
+
+.hero-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.hero-art .cover-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .hero-svg {
@@ -1613,6 +1627,38 @@ body {
 .book-progress-line strong {
   color: var(--lf-accent);
   font-size: 15px;
+}
+
+/* ── 封面库选择器 ─────────── */
+.cover-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 10px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding: 4px;
+  margin-top: 12px;
+}
+
+.cover-pick {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  background: var(--lf-field);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.cover-pick:hover {
+  border-color: var(--lf-accent);
+}
+
+.cover-pick.active {
+  border-color: var(--lf-accent);
+  box-shadow: 0 0 0 3px rgba(66, 119, 101, 0.25);
 }
 
 /* ── 单词学习会话 ─────────────────────────── */

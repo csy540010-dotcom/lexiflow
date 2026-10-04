@@ -7,6 +7,7 @@ import { buildOrganizeTextPrompt, extractJsonObject } from './prompts'
 import { getAiConfig } from './settings'
 import { lookupDictionary } from './dictionary'
 import { resolveBookId } from './study'
+import { nextFreeCoverId } from './covers'
 import type { TrackItem, MusicWordItem } from '../shared/types'
 
 /* ── 音乐听力（MP3 + 文本导入 / AI 整理 / 播放） ─────────────── */
@@ -21,10 +22,12 @@ interface TrackRow {
   duration: number
   collection: string
   cover_file: string
+  cover_id: string
   created_at: string
 }
 
-const TRACK_COLS = 'id, title, audio_file, text_content, segments, notes, duration, collection, cover_file, created_at'
+const TRACK_COLS =
+  'id, title, audio_file, text_content, segments, notes, duration, collection, cover_file, cover_id, created_at'
 
 export function musicDir(): string {
   const dir = path.join(app.getPath('userData'), 'music')
@@ -50,6 +53,7 @@ function mapTrack(r: TrackRow): TrackItem {
     duration: Number(r.duration) || 0,
     collection: r.collection ?? '',
     coverFile: r.cover_file ?? '',
+    coverId: r.cover_id ?? '',
     createdAt: r.created_at
   }
 }
@@ -75,8 +79,8 @@ export function importAudioFromPath(srcPath: string): TrackItem {
   fs.copyFileSync(srcPath, dest)
   const title = path.basename(srcPath).replace(/\.[^.]+$/, '')
   const info = getDb()
-    .prepare('INSERT INTO tracks (title, audio_file) VALUES (?, ?)')
-    .run(title, name)
+    .prepare('INSERT INTO tracks (title, audio_file, cover_id) VALUES (?, ?, ?)')
+    .run(title, name, nextFreeCoverId('tracks'))
   const row = getDb()
     .prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`)
     .get(Number(info.lastInsertRowid)) as unknown as TrackRow
@@ -138,6 +142,29 @@ export function importCover(id: number, srcPath: string): TrackItem {
   const name = `cover-${Number(id)}-${Date.now()}${ext}`
   fs.copyFileSync(srcPath, path.join(musicDir(), name))
   db.prepare('UPDATE tracks SET cover_file = ? WHERE id = ?').run(name, Number(id))
+  if (old.cover_file) {
+    try {
+      fs.unlinkSync(path.join(musicDir(), old.cover_file))
+    } catch {
+      /* 旧封面已不在也无妨 */
+    }
+  }
+  const row = db.prepare(`SELECT ${TRACK_COLS} FROM tracks WHERE id = ?`).get(Number(id)) as unknown as TrackRow
+  return mapTrack(row)
+}
+
+/** 从封面库给听力换封面（清掉已上传的图片封面，删除旧文件）。 */
+export function setTrackCoverLib(id: number, coverId: string): TrackItem {
+  const db = getDb()
+  const old = db.prepare('SELECT cover_file FROM tracks WHERE id = ?').get(Number(id)) as
+    | { cover_file: string }
+    | undefined
+  if (!old) throw new Error('听力条目不存在。')
+  db.prepare('UPDATE tracks SET cover_id = ?, cover_file = ? WHERE id = ?').run(
+    String(coverId ?? '').trim(),
+    '',
+    Number(id)
+  )
   if (old.cover_file) {
     try {
       fs.unlinkSync(path.join(musicDir(), old.cover_file))

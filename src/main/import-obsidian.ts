@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getDb, kvGet, kvSet } from './db'
 import { lookupDictionary } from './dictionary'
+import { ensureUniqueCovers } from './covers'
 import type { ImportPreview, ImportResult } from '../shared/types'
 
 /**
@@ -196,6 +197,8 @@ export function importObsidianData(dir: string): ImportResult {
   run()
 
   kvSet('last_obsidian_import_at', new Date().toISOString())
+  // 导入可能新建词书：补齐互不重复的封面
+  ensureUniqueCovers()
   return { ...preview, addedWords, addedReviews, addedRecords, skippedWords }
 }
 

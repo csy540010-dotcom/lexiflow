@@ -4,6 +4,7 @@ import type { BookSummary, CustomTaskItem, PlanSettings, TodaySummary } from '..
 import PlanModal from '../components/PlanModal'
 import HomeHero from '../components/HomeHero'
 import BookCover from '../components/BookCover'
+import CoverPicker from '../components/CoverPicker'
 
 const TASK_KINDS: Array<{ id: string; icon: string; label: string }> = [
   { id: 'listening', icon: '🎧', label: '听力' },
@@ -23,6 +24,7 @@ export default function Today(): React.JSX.Element {
   const [tasks, setTasks] = useState<CustomTaskItem[]>([])
   const [plan, setPlan] = useState<PlanSettings | null>(null)
   const [showPlan, setShowPlan] = useState(false)
+  const [showCover, setShowCover] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newKind, setNewKind] = useState('listening')
   const [newTitle, setNewTitle] = useState('')
@@ -79,7 +81,11 @@ export default function Today(): React.JSX.Element {
       {summary && (
         <div className="card book-card" style={{ marginTop: 16 }}>
           <div className="book-card-head">
-            <BookCover name={summary.bookName} size="md" />
+            <BookCover
+              coverId={books.find((b) => b.id === summary.bookId)?.coverId}
+              seed={summary.bookName}
+              size="md"
+            />
             <div className="book-head-main">
               <p className="book-eyebrow">当前词书</p>
               <div className="book-title-row">
@@ -95,6 +101,9 @@ export default function Today(): React.JSX.Element {
                     </option>
                   ))}
                 </select>
+                <button className="text-btn" onClick={() => setShowCover(true)}>
+                  换封面
+                </button>
               </div>
               <div className="bar" style={{ marginTop: 10 }}>
                 <div
@@ -250,6 +259,20 @@ export default function Today(): React.JSX.Element {
             void reload()
             flash('学习计划已保存，立即生效')
           }}
+        />
+      )}
+
+      {showCover && summary && (
+        <CoverPicker
+          title={`给「${summary.bookName}」选封面`}
+          currentId={books.find((b) => b.id === summary.bookId)?.coverId}
+          onPick={async (id) => {
+            await window.lexi.setBookCover(summary.bookId, id)
+            setShowCover(false)
+            await reload()
+            flash('词书封面已更新')
+          }}
+          onClose={() => setShowCover(false)}
         />
       )}
 

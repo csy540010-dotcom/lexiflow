@@ -49,6 +49,7 @@ export interface BookSummary {
   slug: string
   name: string
   source: string
+  coverId: string
   total: number
   learning: number
   mastered: number
@@ -255,7 +256,19 @@ export interface TrackItem {
   duration: number
   collection: string
   coverFile: string
+  coverId: string
   createdAt: string
+}
+
+/* ── 封面库（书 + 听力共用） ─────────────── */
+
+/** 封面库总数：8 种场景 × 4 种配色。 */
+export const COVER_LIBRARY_SIZE = 32
+
+/** 封面库 ID：c00 - c31。 */
+export function coverIdAt(index: number): string {
+  const n = ((index % COVER_LIBRARY_SIZE) + COVER_LIBRARY_SIZE) % COVER_LIBRARY_SIZE
+  return 'c' + String(n).padStart(2, '0')
 }
 
 /* ── 单词详情增强（M6.5） ─────────────── */

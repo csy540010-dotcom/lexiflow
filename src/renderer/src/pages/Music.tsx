@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MusicWordItem, TrackItem } from '../../../shared/types'
 import { waveHeights } from '../lib/covers'
-import CoverArt from '../components/CoverArt'
+import { CoverArtAuto, CoverArtById } from '../components/CoverArt'
+import CoverPicker from '../components/CoverPicker'
 
 function fmtTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '00:00'
@@ -30,7 +31,7 @@ function TrackCover({ track, size }: CoverProps): React.JSX.Element {
   }
   return (
     <span className={'cover-tile cover-' + size} aria-hidden="true">
-      <CoverArt seed={track.title} />
+      {track.coverId ? <CoverArtById id={track.coverId} /> : <CoverArtAuto seed={track.title} />}
     </span>
   )
 }
@@ -52,6 +53,7 @@ export default function Music(): React.JSX.Element {
   const [speed, setSpeed] = useState(1.0)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<{ id: number; done: number; total: number } | null>(null)
+  const [showCoverPicker, setShowCoverPicker] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -165,8 +167,16 @@ export default function Music(): React.JSX.Element {
     const updated = await window.lexi.pickTrackCover(selected.id)
     if (updated) {
       applyUpdated(updated)
-      flash('封面已更新')
+      flash('封面已更新（来自本地图片）')
     }
+  }
+
+  async function pickCoverFromLib(coverId: string): Promise<void> {
+    if (!selected) return
+    const updated = await window.lexi.setTrackCoverLib(selected.id, coverId)
+    applyUpdated(updated)
+    setShowCoverPicker(false)
+    flash('封面已更新（来自封面库）')
   }
 
   async function saveText(): Promise<void> {
@@ -383,7 +393,7 @@ export default function Music(): React.JSX.Element {
                     </div>
                   </div>
                   <div className="player-head-actions">
-                    <button className="text-btn" onClick={() => void changeCover()}>
+                    <button className="text-btn" onClick={() => setShowCoverPicker(true)}>
                       换封面
                     </button>
                     <button className="text-btn task-remove" onClick={() => void removeTrack(selected)}>
@@ -561,6 +571,16 @@ export default function Music(): React.JSX.Element {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+
+      {showCoverPicker && selected && (
+        <CoverPicker
+          title={`给「${selected.title}」选封面`}
+          currentId={selected.coverId}
+          onPick={(id) => void pickCoverFromLib(id)}
+          onUpload={() => void changeCover()}
+          onClose={() => setShowCoverPicker(false)}
+        />
+      )}
     </section>
   )
 }

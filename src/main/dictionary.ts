@@ -2,6 +2,7 @@ import { app } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { getDb, kvGet, kvSet } from './db'
+import { nextFreeCoverId } from './covers'
 
 const DICT_VERSION = '2'
 
@@ -110,8 +111,9 @@ export function ensureBuiltinBooks(): { created: boolean; words: number } {
     let bookId: number
     if (!existing) {
       bookId = Number(
-        db.prepare("INSERT INTO books (slug, name, source) VALUES (?, ?, 'builtin')").run(slug, name)
-          .lastInsertRowid
+        db
+          .prepare("INSERT INTO books (slug, name, source, cover_id) VALUES (?, ?, 'builtin', ?)")
+          .run(slug, name, nextFreeCoverId('books')).lastInsertRowid
       )
       created = true
     } else {

@@ -122,7 +122,7 @@ export default function Vocabulary(): React.JSX.Element {
 
       <div className="card vocab-card">
         <div className="vocab-toolbar">
-          {currentBook && <BookCover name={currentBook.name} size="sm" />}
+          {currentBook && <BookCover coverId={currentBook.coverId} seed={currentBook.name} size="sm" />}
           <select
             value={bookId ?? ''}
             onChange={(e) => {

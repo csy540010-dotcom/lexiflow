@@ -40,6 +40,7 @@ const api = {
   createBook: (name: string): Promise<number> => ipcRenderer.invoke('library:books:create', name),
   renameBook: (id: number, name: string): Promise<void> => ipcRenderer.invoke('library:books:rename', id, name),
   deleteBook: (id: number): Promise<void> => ipcRenderer.invoke('library:books:delete', id),
+  setBookCover: (id: number, coverId: string): Promise<void> => ipcRenderer.invoke('library:books:setCover', id, coverId),
   queryWords: (args: WordQueryArgs): Promise<WordListResult> => ipcRenderer.invoke('library:words:query', args),
   getWord: (id: number): Promise<WordDetailData | null> => ipcRenderer.invoke('library:words:get', id),
   updateWord: (id: number, patch: WordUpdatePatch): Promise<WordDetailData | null> =>
@@ -114,6 +115,8 @@ const api = {
     ipcRenderer.invoke('music:setCollection', id, name),
   pickTrackCover: (id: number): Promise<TrackItem | null> => ipcRenderer.invoke('music:pickCover', id),
   clearTrackSegments: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:clearSegments', id),
+  setTrackCoverLib: (id: number, coverId: string): Promise<TrackItem> =>
+    ipcRenderer.invoke('music:setCoverLib', id, coverId),
   extractTrackWords: (id: number): Promise<MusicWordItem[]> => ipcRenderer.invoke('music:words', id),
   deleteTrack: (id: number): Promise<TrackItem[]> => ipcRenderer.invoke('music:delete', id),
   organizeTrack: (id: number): Promise<TrackItem> => ipcRenderer.invoke('music:organize', id),

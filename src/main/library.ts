@@ -1,5 +1,6 @@
 import { getDb } from './db'
 import { lookupDictionary } from './dictionary'
+import { nextFreeCoverId } from './covers'
 import type {
   BookSummary,
   WordDetailData,
@@ -16,6 +17,7 @@ interface BookCountRow {
   slug: string
   name: string
   source: string
+  cover_id: string
   total: number
   learning: number
   mastered: number
@@ -26,7 +28,7 @@ interface BookCountRow {
 export function listBooks(): BookSummary[] {
   const rows = getDb()
     .prepare(
-      `SELECT b.id, b.slug, b.name, b.source,
+      `SELECT b.id, b.slug, b.name, b.source, b.cover_id,
               (SELECT COUNT(*) FROM words w WHERE w.book_id = b.id) AS total,
               (SELECT COUNT(*) FROM words w WHERE w.book_id = b.id AND w.status > 0) AS learning,
               (SELECT COUNT(*) FROM words w WHERE w.book_id = b.id AND w.status = 2) AS mastered,
@@ -37,7 +39,24 @@ export function listBooks(): BookSummary[] {
        ORDER BY CASE b.slug WHEN 'cet4' THEN 1 WHEN 'cet6' THEN 2 ELSE 3 END, b.id`
     )
     .all() as unknown as BookCountRow[]
-  return rows.map((r) => ({ ...r, total: Number(r.total) || 0, learning: Number(r.learning) || 0, mastered: Number(r.mastered) || 0, favorites: Number(r.favorites) || 0, due: Number(r.due) || 0 }))
+  return rows.map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    name: r.name,
+    source: r.source,
+    coverId: r.cover_id ?? '',
+    total: Number(r.total) || 0,
+    learning: Number(r.learning) || 0,
+    mastered: Number(r.mastered) || 0,
+    favorites: Number(r.favorites) || 0,
+    due: Number(r.due) || 0
+  }))
+}
+
+/** 手动指定词书封面（从封面库选）。 */
+export function setBookCover(id: number, coverId: string): void {
+  const info = getDb().prepare('UPDATE books SET cover_id = ? WHERE id = ?').run(String(coverId ?? '').trim(), Number(id))
+  if (info.changes === 0) throw new Error('词书不存在。')
 }
 
 function uniqueSlug(name: string): string {
@@ -54,8 +73,8 @@ export function createBook(name: string): BookSummary['id'] {
   if (!trimmed) throw new Error('词书名称不能为空。')
   return Number(
     getDb()
-      .prepare("INSERT INTO books (slug, name, source) VALUES (?, ?, 'local')")
-      .run(uniqueSlug(trimmed), trimmed).lastInsertRowid
+      .prepare("INSERT INTO books (slug, name, source, cover_id) VALUES (?, ?, 'local', ?)")
+      .run(uniqueSlug(trimmed), trimmed, nextFreeCoverId('books')).lastInsertRowid
   )
 }
 

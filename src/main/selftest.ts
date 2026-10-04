@@ -25,6 +25,7 @@ interface LibraryHooks {
   updateWord: (id: number, patch: { favorite?: 0 | 1; notes?: string; status?: 0 | 1 | 2 }) => WordDetailData | null
   createBook: (name: string) => number
   deleteBook: (id: number) => void
+  setCover: (bookId: number, coverId: string) => void
 }
 
 interface ImportHooks {
@@ -118,6 +119,7 @@ export interface SelfTestHooks {
     setDuration: (id: number, seconds: number) => { id: number; duration: number }
     setCollection: (id: number, name: string) => { id: number; collection: string }
     importCover: (id: number, srcPath: string) => { id: number; coverFile: string }
+    setCoverLib: (id: number, coverId: string) => { id: number; coverId: string; coverFile: string }
     clearSegments: (id: number) => { id: number; segments: string[] }
     words: (id: number) => Array<{ word: string; meaning: string; inBook: boolean }>
     clean: (text: string) => string
@@ -214,6 +216,19 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     const cet6 = books.find((b) => b.slug === 'cet6')
     assert(!!cet4 && cet4.total === 4544, `内置四级书 4544 词（实际 ${cet4?.total ?? 0}）`)
     assert(!!cet6 && cet6.total === 3991, `内置六级书 3991 词（实际 ${cet6?.total ?? 0}）`)
+    // 封面库：词书封面自动分配且互不重复
+    const bookCovers = books.map((b) => b.coverId)
+    assert(
+      bookCovers.every((id) => /^c\d{2}$/.test(id)) && new Set(bookCovers).size === bookCovers.length,
+      `词书封面：自动分配且互不重复（${bookCovers.join(',')}）`
+    )
+    const coverBookId = hooks.library.createBook('封面测试书')
+    const newBookCover = hooks.library.listBooks().find((b) => b.id === coverBookId)?.coverId
+    assert(!!newBookCover && !bookCovers.includes(newBookCover), `新建词书自动分配新封面（${newBookCover}）`)
+    const targetCover = newBookCover === 'c05' ? 'c06' : 'c05'
+    hooks.library.setCover(coverBookId, targetCover)
+    assert(hooks.library.listBooks().find((b) => b.id === coverBookId)?.coverId === targetCover, '词书：从封面库换封面')
+    hooks.library.deleteBook(coverBookId)
 
     // 6. Obsidian 导入器：fixture 全链路（先幂等清理上一次的 fixture 残留）
     hooks.import.cleanup(['personal', 'zz-test'])
@@ -483,6 +498,9 @@ export async function runSelfTest(win: BrowserWindow, hooks: SelfTestHooks): Pro
     assert(withCover.coverFile.length > 0, `听力：封面图导入（${withCover.coverFile}）`)
     const coverCopied = path.join(process.env.APPDATA || '', 'lexiflow', 'music', withCover.coverFile)
     assert(fs.existsSync(coverCopied), '听力：封面副本已保存到 App 数据目录')
+    const lib2 = hooks.music.setCoverLib(track.id, 'c11')
+    assert(lib2.coverId === 'c11' && lib2.coverFile === '', '听力：从封面库换封面（清掉上传图）')
+    assert(!fs.existsSync(coverCopied), '听力：换库封面后旧图片副本已清理')
     getDb().prepare('UPDATE tracks SET segments = ? WHERE id = ?').run(JSON.stringify(['a', 'b']), track.id)
     assert(hooks.music.clearSegments(track.id).segments.length === 0, '听力：AI 重置整理清空分段')
     const cleanedSub = hooks.music.clean('[ti:0]\n[00:01.74]Hello world.\n[00:04.74]How are you?\n\n[00:09.46]Fine.')

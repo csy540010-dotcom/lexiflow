@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MusicWordItem, TrackItem } from '../../../shared/types'
-import { coverBackground, waveHeights } from '../lib/covers'
+import { waveHeights } from '../lib/covers'
+import CoverArt from '../components/CoverArt'
 
 function fmtTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '00:00'
@@ -28,8 +29,8 @@ function TrackCover({ track, size }: CoverProps): React.JSX.Element {
     )
   }
   return (
-    <span className={'cover-tile cover-' + size} style={{ background: coverBackground(track.title) }} aria-hidden="true">
-      ♫
+    <span className={'cover-tile cover-' + size} aria-hidden="true">
+      <CoverArt seed={track.title} />
     </span>
   )
 }

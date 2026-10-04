@@ -39,6 +39,7 @@ export default function StudySession(): React.JSX.Element {
   const [idx, setIdx] = useState(0)
   const [word, setWord] = useState<WordDetailData | null>(null)
   const [explain, setExplain] = useState('')
+  const [explainCollapsed, setExplainCollapsed] = useState(false)
   const [sentence, setSentence] = useState('')
   const [grade, setGrade] = useState<{ sentence: string; grade: GradePayload } | null>(null)
   const [busy, setBusy] = useState<'explain' | 'grade' | null>(null)
@@ -56,7 +57,10 @@ export default function StudySession(): React.JSX.Element {
   const loadWord = useCallback((id: number): void => {
     void window.lexi.getWord(id).then((w) => {
       setWord(w)
-      setExplain(w ? cachedExplain(w) : '')
+      const cached = w ? cachedExplain(w) : ''
+      setExplain(cached)
+      // 已有缓存讲解说明读过一遍，默认收起给练习腾地方；新讲解默认展开
+      setExplainCollapsed(Boolean(cached))
       setGrade(w ? latestGrade(w) : null)
       setSentence('')
       setError('')
@@ -74,6 +78,7 @@ export default function StudySession(): React.JSX.Element {
     try {
       const r = await window.lexi.explainWord(word.id)
       setExplain(r.content)
+      setExplainCollapsed(false)
       const w = await window.lexi.getWord(word.id)
       if (w) setWord(w)
     } catch (e) {
@@ -168,16 +173,27 @@ export default function StudySession(): React.JSX.Element {
           </div>
 
           <div className="card module-card" style={{ marginTop: 16 }}>
-            <h3 className="card-h3">AI 讲解</h3>
+            <div className="card-head-row">
+              <h3 className="card-h3">AI 讲解</h3>
+              {explain && (
+                <button className="text-btn" onClick={() => setExplainCollapsed((v) => !v)}>
+                  {explainCollapsed ? '展开讲解 ▾' : '收起讲解 ▴'}
+                </button>
+              )}
+            </div>
             {explain ? (
-              <>
-                <pre className="explain-content">{explain}</pre>
-                <div className="btn-row">
-                  <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={() => void generateExplain()}>
-                    重新讲解
-                  </button>
-                </div>
-              </>
+              explainCollapsed ? (
+                <p className="stub-note">讲解已收起，需要时点上方「展开讲解」。</p>
+              ) : (
+                <>
+                  <pre className="explain-content">{explain}</pre>
+                  <div className="btn-row">
+                    <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={() => void generateExplain()}>
+                      重新讲解
+                    </button>
+                  </div>
+                </>
+              )
             ) : (
               <>
                 <p className="section-note">让 AI 把这个词讲透：核心含义、常用于、例句、搭配。</p>
